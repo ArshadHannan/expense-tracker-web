@@ -3,6 +3,7 @@
 import { ChangeEvent, DragEvent, useRef, useState } from "react";
 
 type ReceiptFile = {
+  file: File;
   id: string;
   name: string;
   size: number;
@@ -14,14 +15,18 @@ const acceptedFileTypes = ["application/pdf", "image/jpeg", "image/png", "image/
 export default function ReceiptImportModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [files, setFiles] = useState<ReceiptFile[]>([]);
   const [emailBody, setEmailBody] = useState("");
+  const [extractError, setExtractError] = useState("");
+  const [extractResponse, setExtractResponse] = useState<unknown>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function addFiles(fileList: FileList | File[]) {
     const nextFiles = Array.from(fileList)
       .filter((file) => acceptedFileTypes.includes(file.type))
       .map((file) => ({
+        file,
         id: `${file.name}-${file.size}-${file.lastModified}`,
         name: file.name,
         size: file.size,
@@ -57,6 +62,40 @@ export default function ReceiptImportModal() {
   function closeModal() {
     setIsOpen(false);
     setIsDragging(false);
+  }
+
+  async function importReceipts() {
+    setIsUploading(true);
+    setExtractError("");
+    setExtractResponse(null);
+
+    try {
+      const formData = new FormData();
+
+      for (const receiptFile of files) {
+        formData.append("files", receiptFile.file, receiptFile.name);
+      }
+
+      formData.set("emailBody", emailBody);
+
+      const response = await fetch("/api/receipts/extract", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Receipt extraction failed.");
+      }
+
+      setExtractResponse(data);
+    } catch (error) {
+      setExtractError(
+        error instanceof Error ? error.message : "Receipt extraction failed.",
+      );
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   return (
@@ -179,6 +218,23 @@ export default function ReceiptImportModal() {
                   </div>
                 </div>
               ) : null}
+
+              {extractError ? (
+                <div className="rounded-[8px] border border-red-400/30 bg-red-950/30 p-4 text-sm leading-6 text-red-200">
+                  {extractError}
+                </div>
+              ) : null}
+
+              {extractResponse ? (
+                <div className="rounded-[8px] border border-border bg-secondary p-4">
+                  <p className="mb-3 text-sm font-medium text-text-primary">
+                    Backend response
+                  </p>
+                  <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-xs leading-5 text-text-secondary">
+                    {JSON.stringify(extractResponse, null, 2)}
+                  </pre>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-col-reverse gap-3 border-t border-border px-6 py-5 sm:flex-row sm:justify-end">
@@ -191,11 +247,14 @@ export default function ReceiptImportModal() {
               </button>
               <button
                 className="h-10 rounded-[8px] bg-primary px-4 text-sm font-semibold text-text-button transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={files.length === 0 && emailBody.trim().length === 0}
-                onClick={closeModal}
+                disabled={
+                  isUploading ||
+                  (files.length === 0 && emailBody.trim().length === 0)
+                }
+                onClick={importReceipts}
                 type="button"
               >
-                Import receipts
+                {isUploading ? "Importing..." : "Import receipts"}
               </button>
             </div>
           </div>
