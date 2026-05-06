@@ -1,16 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #101010;
+  --background: #101010;
+  --foreground: #ffffff;
   --primary: #59b655;
   --primary-dark: #3d8f3a;
-  --primary-soft: #edf8ec;
+  --primary-soft: #1c321d;
   --secondary: #101010;
-  --secondary-muted: #5f6460;
-  --surface: #ffffff;
-  --surface-muted: #f6f8f5;
-  --border: #dde7dc;
+  --secondary-muted: #9d9d9d;
+  --text-primary: #ffffff;
+  --text-secondary: #9d9d9d;
+  --text-button: #101010;
+  --surface: #161616;
+  --surface-muted: #20221f;
+  --border: #30382f;
 }
 
 @theme inline {
@@ -21,6 +24,9 @@
   --color-primary-soft: var(--primary-soft);
   --color-secondary: var(--secondary);
   --color-secondary-muted: var(--secondary-muted);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-button: var(--text-button);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-border: var(--border);
@@ -31,11 +37,14 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #101010;
-    --foreground: #ededed;
+    --foreground: #ffffff;
     --surface: #161616;
     --surface-muted: #20221f;
     --border: #30382f;
-    --secondary-muted: #b7beb6;
+    --secondary-muted: #9d9d9d;
+    --text-primary: #ffffff;
+    --text-secondary: #9d9d9d;
+    --text-button: #101010;
   }
 }
 

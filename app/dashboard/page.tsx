@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import ReceiptImportModal from "./receipt-import-modal";
+
 const stats = [
   { label: "Total spend", value: "$18,420", change: "12% under budget" },
   { label: "This month", value: "$4,860", change: "$1,140 remaining" },
@@ -17,17 +21,23 @@ const budgets = [
   { name: "Marketing", spent: 42 },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
-    <main className="min-h-screen bg-surface-muted text-secondary">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-border bg-secondary px-5 py-6 text-white lg:block">
+    <main className="min-h-screen bg-background text-text-primary">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-border bg-secondary px-5 py-6 text-text-primary lg:block">
         <div className="mb-10 flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-secondary">
+          <div className="grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
             ET
           </div>
           <div>
             <p className="font-semibold">Expense Tracker</p>
-            <p className="text-xs text-white/52">Finance console</p>
+            <p className="text-xs text-text-secondary">Finance console</p>
           </div>
         </div>
 
@@ -37,8 +47,8 @@ export default function DashboardPage() {
               <a
                 className={`block rounded-[8px] px-3 py-2.5 ${
                   item === "Overview"
-                    ? "bg-primary text-secondary"
-                    : "text-white/68 transition hover:bg-white/8 hover:text-white"
+                    ? "bg-primary text-text-button"
+                    : "text-text-secondary transition hover:bg-white/8 hover:text-text-primary"
                 }`}
                 href="#"
                 key={item}
@@ -60,12 +70,22 @@ export default function DashboardPage() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <button className="h-10 rounded-[8px] border border-border bg-white px-4 text-sm font-medium transition hover:border-primary">
-                Export
-              </button>
-              <button className="h-10 rounded-[8px] bg-secondary px-4 text-sm font-medium text-white transition hover:bg-primary hover:text-secondary">
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-medium">{user.name}</p>
+                <p className="text-xs text-text-secondary">{user.email}</p>
+              </div>
+              <ReceiptImportModal />
+              <button className="h-10 rounded-[8px] bg-primary px-4 text-sm font-medium text-text-button transition hover:bg-primary-dark">
                 Add expense
               </button>
+              <form action="/auth/logout" method="POST">
+                <button
+                  className="h-10 rounded-[8px] bg-primary px-4 text-sm font-medium text-text-button transition hover:bg-primary-dark"
+                  type="submit"
+                >
+                  Log out
+                </button>
+              </form>
             </div>
           </div>
         </header>
@@ -77,7 +97,7 @@ export default function DashboardPage() {
                 className="rounded-[8px] border border-border bg-surface p-5"
                 key={stat.label}
               >
-                <p className="text-sm text-secondary-muted">{stat.label}</p>
+                <p className="text-sm text-text-secondary">{stat.label}</p>
                 <p className="mt-3 text-3xl font-semibold">{stat.value}</p>
                 <p className="mt-2 text-sm font-medium text-primary">
                   {stat.change}
@@ -91,18 +111,18 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between border-b border-border p-5">
                 <div>
                   <h2 className="text-lg font-semibold">Recent expenses</h2>
-                  <p className="text-sm text-secondary-muted">
+                  <p className="text-sm text-text-secondary">
                     Latest activity across teams
                   </p>
                 </div>
-                <span className="rounded-[8px] bg-primary-soft px-3 py-1 text-sm font-medium text-primary-dark">
+                <span className="rounded-[8px] bg-primary-soft px-3 py-1 text-sm font-medium text-primary">
                   Live
                 </span>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-left text-sm">
-                  <thead className="bg-surface-muted text-secondary-muted">
+                  <thead className="bg-surface-muted text-text-secondary">
                     <tr>
                       <th className="px-5 py-3 font-medium">Merchant</th>
                       <th className="px-5 py-3 font-medium">Team</th>
@@ -114,7 +134,7 @@ export default function DashboardPage() {
                     {transactions.map(([merchant, team, amount, status]) => (
                       <tr key={merchant}>
                         <td className="px-5 py-4 font-medium">{merchant}</td>
-                        <td className="px-5 py-4 text-secondary-muted">
+                        <td className="px-5 py-4 text-text-secondary">
                           {team}
                         </td>
                         <td className="px-5 py-4">{amount}</td>
@@ -132,7 +152,7 @@ export default function DashboardPage() {
 
             <section className="rounded-[8px] border border-border bg-surface p-5">
               <h2 className="text-lg font-semibold">Budget health</h2>
-              <p className="mt-1 text-sm text-secondary-muted">
+              <p className="mt-1 text-sm text-text-secondary">
                 Spend against monthly limits
               </p>
               <div className="mt-6 space-y-5">
@@ -140,7 +160,7 @@ export default function DashboardPage() {
                   <div key={budget.name}>
                     <div className="mb-2 flex justify-between text-sm">
                       <span className="font-medium">{budget.name}</span>
-                      <span className="text-secondary-muted">
+                      <span className="text-text-secondary">
                         {budget.spent}%
                       </span>
                     </div>
