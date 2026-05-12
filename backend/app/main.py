@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Annotated
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile, Query
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -12,6 +14,15 @@ from firebase_admin import credentials, firestore
 load_dotenv()
 
 app = FastAPI(title="Expense Tracker Receipt Extractor")
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize Firebase
 try:
@@ -83,3 +94,39 @@ async def extract_receipt(
             receipt_data["warning"] = "User email required to save"
 
     return receipt_data
+
+
+@app.get("/receipts")
+async def get_receipts(userEmail: str = Query(...)) -> dict:
+    """Fetch all receipts for a user, sorted by date (newest first)"""
+    if not db:
+        return JSONResponse(
+            {"error": "Firebase not initialized", "receipts": []}, status_code=500
+        )
+
+    if not userEmail:
+        return JSONResponse(
+            {"error": "User email required", "receipts": []}, status_code=400
+        )
+
+    try:
+        receipts_ref = (
+            db.collection("users")
+            .document(userEmail)
+            .collection("receipts")
+            .order_by("created_at", direction="DESCENDING")
+            .stream()
+        )
+
+        receipts = []
+        for doc in receipts_ref:
+            receipt = doc.to_dict()
+            receipt["id"] = doc.id
+            receipts.append(receipt)
+
+        return {"status": "success", "count": len(receipts), "receipts": receipts}
+    except Exception as e:
+        print(f"Error fetching receipts: {e}")
+        return JSONResponse(
+            {"error": str(e), "receipts": []}, status_code=500
+        )
