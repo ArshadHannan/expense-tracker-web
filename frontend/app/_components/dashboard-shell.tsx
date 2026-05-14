@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import ReceiptImportModal from "./receipt-import-modal";
 
 type DashboardShellProps = {
@@ -26,8 +26,25 @@ export default function DashboardShell({
   user,
 }: DashboardShellProps) {
   const pathname = usePathname();
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const title =
     navItems.find((item) => item.href === pathname)?.label ?? "Dashboard";
+
+  useEffect(() => {
+    function closeProfileMenu(event: MouseEvent) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeProfileMenu);
+
+    return () => document.removeEventListener("mousedown", closeProfileMenu);
+  }, []);
 
   return (
     <main className="min-h-screen bg-background text-text-primary">
@@ -73,22 +90,59 @@ export default function DashboardShell({
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-text-secondary">{user.email}</p>
-              </div>
               <ReceiptImportModal />
               <button className="h-10 rounded-[8px] bg-primary px-4 text-sm font-medium text-text-button transition hover:bg-primary-dark">
                 Add expense
               </button>
-              <form action="/auth/logout" method="POST">
+              <div className="relative" ref={profileMenuRef}>
                 <button
-                  className="h-10 rounded-[8px] bg-primary px-4 text-sm font-medium text-text-button transition hover:bg-primary-dark"
-                  type="submit"
+                  aria-expanded={isProfileMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="Open profile menu"
+                  className="grid size-10 place-items-center rounded-[8px] border border-border bg-secondary text-sm font-semibold text-text-primary transition hover:border-primary hover:text-primary"
+                  onClick={() => setIsProfileMenuOpen((isOpen) => !isOpen)}
+                  type="button"
                 >
-                  Log out
+                  <svg
+                    aria-hidden="true"
+                    className="size-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M20 21a8 8 0 0 0-16 0" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
                 </button>
-              </form>
+
+                {isProfileMenuOpen ? (
+                  <div
+                    className="absolute right-0 top-12 z-20 w-64 rounded-[8px] border border-border bg-surface p-3 shadow-lg"
+                    role="menu"
+                  >
+                    <div className="border-b border-border pb-3">
+                      <p className="truncate text-sm font-medium">
+                        {user.name}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-text-secondary">
+                        {user.email}
+                      </p>
+                    </div>
+                    <form action="/auth/logout" method="POST">
+                      <button
+                        className="mt-3 h-10 w-full rounded-[8px] bg-primary px-4 text-sm font-medium text-text-button transition hover:bg-primary-dark"
+                        role="menuitem"
+                        type="submit"
+                      >
+                        Log out
+                      </button>
+                    </form>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </header>

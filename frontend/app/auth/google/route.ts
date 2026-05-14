@@ -9,7 +9,7 @@ import {
 import {
   createGoogleAuthorizationUrl,
   createPkceChallenge,
-} from "@/lib/google";
+} from "../_lib/google";
 
 export async function GET(request: NextRequest) {
   try {

@@ -78,7 +78,7 @@ export default function ReceiptImportModal() {
 
       formData.set("emailBody", emailBody);
 
-      const response = await fetch("/api/receipts/extract", {
+      const response = await fetch("/api/receipts", {
         method: "POST",
         body: formData,
       });

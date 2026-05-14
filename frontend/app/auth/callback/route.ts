@@ -10,7 +10,7 @@ import {
 import {
   exchangeGoogleAuthorizationCode,
   loadGoogleProfile,
-} from "@/lib/google";
+} from "../_lib/google";
 
 export async function GET(request: NextRequest) {
   const error = request.nextUrl.searchParams.get("error");
