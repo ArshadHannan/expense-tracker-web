@@ -1,14 +1,33 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 import ReceiptImportModal from "./receipt-import-modal";
-import ReceiptsTable from "./receipts-table";
 
-export default async function DashboardPage() {
-  const user = await getCurrentUser();
+type DashboardShellProps = {
+  children: ReactNode;
+  user: {
+    name: string;
+    email: string;
+  };
+};
 
-  if (!user) {
-    redirect("/login");
-  }
+const navItems = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/expenses", label: "Expenses" },
+  { href: "/budgets", label: "Budgets" },
+  { href: "/approvals", label: "Approvals" },
+  { href: "/report", label: "Report" },
+];
+
+export default function DashboardShell({
+  children,
+  user,
+}: DashboardShellProps) {
+  const pathname = usePathname();
+  const title =
+    navItems.find((item) => item.href === pathname)?.label ?? "Dashboard";
 
   return (
     <main className="min-h-screen bg-background text-text-primary">
@@ -24,21 +43,23 @@ export default async function DashboardPage() {
         </div>
 
         <nav className="space-y-1 text-sm">
-          {["Overview", "Expenses", "Budgets", "Approvals", "Reports"].map(
-            (item) => (
-              <a
-                className={`block rounded-[8px] px-3 py-2.5 ${
-                  item === "Overview"
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`block w-full rounded-[8px] px-3 py-2.5 transition ${
+                  isActive
                     ? "bg-primary text-text-button"
-                    : "text-text-secondary transition hover:bg-white/8 hover:text-text-primary"
+                    : "text-text-secondary hover:bg-white/8 hover:text-text-primary"
                 }`}
-                href="#"
-                key={item}
               >
-                {item}
-              </a>
-            ),
-          )}
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
       </aside>
 
@@ -48,7 +69,7 @@ export default async function DashboardPage() {
             <div>
               <p className="text-sm font-medium text-primary">Dashboard</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-                Company spending overview
+                {title}
               </h1>
             </div>
             <div className="flex items-center gap-3">
@@ -73,7 +94,7 @@ export default async function DashboardPage() {
         </header>
 
         <section className="mx-auto max-w-7xl px-6 py-8 sm:px-8">
-          <ReceiptsTable userEmail={user.email} />
+          {children}
         </section>
       </div>
     </main>

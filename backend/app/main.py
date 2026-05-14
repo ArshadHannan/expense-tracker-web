@@ -73,13 +73,30 @@ async def extract_receipt(
             "preview": emailBody[:300],
         },
         "created_at": datetime.utcnow().isoformat(),
+        "total_amount": "1000 Rs",
+        "total_amount_value": 1000,
     }
 
-    # Save to Firestore if available
+    if uploaded_files:
+        receipt_data["expense_name"] = uploaded_files[0]["filename"]
+        content_type = uploaded_files[0]["content_type"]
+        if content_type == "application/pdf":
+            receipt_data["type"] = "PDF"
+        else:
+            receipt_data["type"] = "Image"
+    else:
+        receipt_data["expense_name"] = "Email Receipt"
+        receipt_data["type"] = "Email"
+
+    # Save to Firestore if available, and update running total
     if db and userEmail:
         try:
             db.collection("users").document(userEmail).collection("receipts").add(
                 receipt_data
+            )
+            db.collection("users").document(userEmail).set(
+                {"total_spent": firestore.Increment(1000)},
+                merge=True,
             )
             receipt_data["saved_to_firestore"] = True
         except Exception as e:
@@ -124,7 +141,16 @@ async def get_receipts(userEmail: str = Query(...)) -> dict:
             receipt["id"] = doc.id
             receipts.append(receipt)
 
-        return {"status": "success", "count": len(receipts), "receipts": receipts}
+        user_doc = db.collection("users").document(userEmail).get()
+        user_data = user_doc.to_dict() or {}
+        total_spent = user_data.get("total_spent", 0)
+
+        return {
+            "status": "success",
+            "count": len(receipts),
+            "receipts": receipts,
+            "total_spent": total_spent,
+        }
     except Exception as e:
         print(f"Error fetching receipts: {e}")
         return JSONResponse(
