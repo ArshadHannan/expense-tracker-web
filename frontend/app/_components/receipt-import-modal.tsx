@@ -1,6 +1,8 @@
 "use client";
 
 import { ChangeEvent, DragEvent, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useReceiptsRefresh } from "../_lib/receipts-refresh-context";
 
 type ReceiptFile = {
   file: File;
@@ -13,13 +15,14 @@ type ReceiptFile = {
 const acceptedFileTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 
 export default function ReceiptImportModal() {
+  const { refreshReceipts } = useReceiptsRefresh();
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [files, setFiles] = useState<ReceiptFile[]>([]);
   const [emailBody, setEmailBody] = useState("");
   const [extractError, setExtractError] = useState("");
-  const [extractResponse, setExtractResponse] = useState<unknown>(null);
+  const shouldRefreshOnCloseRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function addFiles(fileList: FileList | File[]) {
@@ -59,15 +62,29 @@ export default function ReceiptImportModal() {
     );
   }
 
-  function closeModal() {
-    setIsOpen(false);
+  function resetForm() {
+    setFiles([]);
+    setEmailBody("");
+    setExtractError("");
     setIsDragging(false);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
+  function closeModal() {
+    if (shouldRefreshOnCloseRef.current) {
+      refreshReceipts();
+      shouldRefreshOnCloseRef.current = false;
+    }
+
+    resetForm();
+    setIsOpen(false);
   }
 
   async function importReceipts() {
     setIsUploading(true);
     setExtractError("");
-    setExtractResponse(null);
 
     try {
       const formData = new FormData();
@@ -88,7 +105,9 @@ export default function ReceiptImportModal() {
         throw new Error(data.error ?? "Receipt extraction failed.");
       }
 
-      setExtractResponse(data);
+      shouldRefreshOnCloseRef.current = true;
+      toast.success("Receipts imported successfully");
+      closeModal();
     } catch (error) {
       setExtractError(
         error instanceof Error ? error.message : "Receipt extraction failed.",
@@ -222,17 +241,6 @@ export default function ReceiptImportModal() {
               {extractError ? (
                 <div className="rounded-[8px] border border-red-400/30 bg-red-950/30 p-4 text-sm leading-6 text-red-200">
                   {extractError}
-                </div>
-              ) : null}
-
-              {extractResponse ? (
-                <div className="rounded-[8px] border border-border bg-secondary p-4">
-                  <p className="mb-3 text-sm font-medium text-text-primary">
-                    Backend response
-                  </p>
-                  <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-xs leading-5 text-text-secondary">
-                    {JSON.stringify(extractResponse, null, 2)}
-                  </pre>
                 </div>
               ) : null}
             </div>
