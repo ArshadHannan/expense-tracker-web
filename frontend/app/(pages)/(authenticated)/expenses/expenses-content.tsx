@@ -8,7 +8,7 @@ type ExpensesContentProps = {
 };
 
 export default function ExpensesContent({ userEmail }: ExpensesContentProps) {
-  const { error, loading, receipts } = useReceipts(userEmail);
+  const { error, loading, receipts, totalSpent } = useReceipts(userEmail);
 
   if (loading) {
     return (
@@ -26,5 +26,5 @@ export default function ExpensesContent({ userEmail }: ExpensesContentProps) {
     );
   }
 
-  return <ReceiptsTable receipts={receipts} />;
+  return <ReceiptsTable receipts={receipts} totalSpent={totalSpent} />;
 }
