@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ReceiptsRefreshProvider } from "../_lib/receipts-refresh-context";
 import ReceiptImportModal from "./receipt-import-modal";
 
 type DashboardShellProps = {
@@ -47,7 +48,8 @@ export default function DashboardShell({
   }, []);
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
+    <ReceiptsRefreshProvider>
+      <main className="min-h-screen bg-background text-text-primary">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-border bg-secondary px-5 py-6 text-text-primary lg:block">
         <div className="mb-10 flex items-center gap-3">
           <div className="grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
@@ -151,6 +153,7 @@ export default function DashboardShell({
           {children}
         </section>
       </div>
-    </main>
+      </main>
+    </ReceiptsRefreshProvider>
   );
 }

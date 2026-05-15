@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useReceiptsRefreshKey } from "./receipts-refresh-context";
 
 type ReceiptFile = {
   filename: string;
@@ -26,6 +27,7 @@ export type Receipt = {
 };
 
 export function useReceipts(userEmail: string) {
+  const refreshKey = useReceiptsRefreshKey();
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,7 @@ export function useReceipts(userEmail: string) {
     if (userEmail) {
       fetchReceipts();
     }
-  }, [userEmail]);
+  }, [userEmail, refreshKey]);
 
   return {
     error,
