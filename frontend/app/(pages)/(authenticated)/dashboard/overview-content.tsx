@@ -17,6 +17,7 @@ const mockExpenseTrend = [
   { date: "May 21", amount: 25700 },
   { date: "May 25", amount: 31800 },
   { date: "May 29", amount: 38000 },
+  { date: "May 31", amount: 50000 },
 ];
 
 export default function OverviewContent({ userEmail }: OverviewContentProps) {
