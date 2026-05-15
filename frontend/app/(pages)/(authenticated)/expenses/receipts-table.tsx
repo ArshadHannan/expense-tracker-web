@@ -4,9 +4,13 @@ import type { Receipt } from "../../../_lib/use-receipts";
 
 export default function ReceiptsTable({
   receipts,
+  totalSpent,
 }: {
   receipts: Receipt[];
+  totalSpent: number;
 }) {
+  const formatTotal = (amount: number) =>
+    `${amount.toLocaleString("en-US")} Rs`;
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -78,6 +82,18 @@ export default function ReceiptsTable({
             </tr>
           ))}
         </tbody>
+        {receipts.length > 0 && (
+          <tfoot>
+            <tr className="border-t border-border bg-secondary">
+              <td className="px-6 py-4 font-medium text-text-primary">Total</td>
+              <td className="px-6 py-4 font-medium text-text-primary">
+                {formatTotal(totalSpent)}
+              </td>
+              <td className="px-6 py-4" />
+              <td className="px-6 py-4" />
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
