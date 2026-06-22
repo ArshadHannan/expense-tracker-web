@@ -36,6 +36,14 @@ function getFakeReceiptExtractionResponse() {
   };
 }
 
+function getFakeReceiptSaveResponse() {
+  return {
+    data_source: "fake",
+    saved_to_firestore: true,
+    status: "saved",
+  };
+}
+
 function getBackendExtractUrl() {
   return process.env.RECEIPT_EXTRACTOR_API_URL;
 }
@@ -46,12 +54,14 @@ function getBackendReceiptsUrl() {
   return extractUrl?.replace(/\/extract-receipt\/?$/, "/receipts");
 }
 
-function getFakeReceiptSaveResponse() {
-  return {
-    data_source: "fake",
-    saved_to_firestore: true,
-    status: "saved",
-  };
+function getMissingBackendUrlResponse() {
+  return NextResponse.json(
+    {
+      error:
+        "Missing RECEIPT_EXTRACTOR_API_URL. Add it to frontend/.env.local and restart npm run dev.",
+    },
+    { status: 500 },
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -61,7 +71,7 @@ export async function GET(request: NextRequest) {
   if (!userEmail) {
     return NextResponse.json(
       { error: "User email is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -73,26 +83,38 @@ export async function GET(request: NextRequest) {
     const backendUrl = getBackendReceiptsUrl();
 
     if (!backendUrl) {
-      return NextResponse.json(getFakeReceiptsResponse(userEmail));
+      return getMissingBackendUrlResponse();
     }
 
-    // Forward the request to the backend
-    const backendResponse = await fetch(`${backendUrl}/receipts?userEmail=${encodeURIComponent(userEmail)}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
+    const backendResponse = await fetch(
+      `${backendUrl}?userEmail=${encodeURIComponent(userEmail)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
       },
-    });
+    );
 
     if (!backendResponse.ok) {
-      return NextResponse.json(getFakeReceiptsResponse(userEmail));
+      const errorData = await backendResponse.json().catch(() => null);
+
+      return NextResponse.json(
+        { error: errorData?.error || "Failed to fetch receipts from backend" },
+        { status: backendResponse.status },
+      );
     }
 
     const data = await backendResponse.json();
+
     return NextResponse.json({ ...data, data_source: "backend" });
   } catch (error) {
     console.error("Error fetching receipts:", error);
-    return NextResponse.json(getFakeReceiptsResponse(userEmail));
+
+    return NextResponse.json(
+      { error: "Unable to fetch receipts from backend." },
+      { status: 500 },
+    );
   }
 }
 
@@ -104,7 +126,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const backendUrl = getBackendExtractUrl();
     const incomingFormData = await request.formData();
     const files = incomingFormData
       .getAll("files")
@@ -117,8 +138,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (shouldUseFakeData() || !backendUrl) {
+    if (shouldUseFakeData()) {
       return NextResponse.json(getFakeReceiptExtractionResponse());
+    }
+
+    const backendUrl = getBackendExtractUrl();
+
+    if (!backendUrl) {
+      return getMissingBackendUrlResponse();
     }
 
     const outgoingFormData = new FormData();
@@ -142,8 +169,12 @@ export async function POST(request: NextRequest) {
 
     if (contentType.includes("application/json")) {
       const data = await backendResponse.json();
+
       if (!backendResponse.ok) {
-        return NextResponse.json(getFakeReceiptExtractionResponse());
+        return NextResponse.json(
+          { error: data?.error || "Receipt extraction failed." },
+          { status: backendResponse.status },
+        );
       }
 
       return NextResponse.json(data, { status: backendResponse.status });
@@ -152,7 +183,10 @@ export async function POST(request: NextRequest) {
     const text = await backendResponse.text();
 
     if (!backendResponse.ok) {
-      return NextResponse.json(getFakeReceiptExtractionResponse());
+      return NextResponse.json(
+        { error: text || "Receipt extraction failed." },
+        { status: backendResponse.status },
+      );
     }
 
     return NextResponse.json(
@@ -161,7 +195,11 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error importing receipt:", error);
-    return NextResponse.json(getFakeReceiptExtractionResponse());
+
+    return NextResponse.json(
+      { error: "Unable to extract receipt from backend." },
+      { status: 500 },
+    );
   }
 }
 
@@ -173,11 +211,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const backendUrl = getBackendReceiptsUrl();
     const receiptData = await request.json();
 
-    if (shouldUseFakeData() || !backendUrl) {
+    if (shouldUseFakeData()) {
       return NextResponse.json(getFakeReceiptSaveResponse());
+    }
+
+    const backendUrl = getBackendReceiptsUrl();
+
+    if (!backendUrl) {
+      return getMissingBackendUrlResponse();
     }
 
     const backendResponse = await fetch(backendUrl, {
@@ -203,6 +246,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error saving receipt:", error);
+
     return NextResponse.json(
       { error: "Unable to save receipt." },
       { status: 500 },
