@@ -53,11 +53,11 @@ export default function DashboardShell({
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-border bg-secondary px-5 py-6 text-text-primary lg:block">
         <div className="mb-10 flex items-center gap-3">
           <div className="grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
-            ET
+            RF
           </div>
           <div>
-            <p className="font-semibold">Expense Tracker</p>
-            <p className="text-xs text-text-secondary">Finance console</p>
+            <p className="font-semibold">RupeeFlow</p>
+            <p className="text-xs text-text-secondary">Rupee console</p>
           </div>
         </div>
 

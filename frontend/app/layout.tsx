@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Expense Tracker",
-  description: "Track spending, budgets, and financial activity.",
+  title: "RupeeFlow",
+  description: "Track rupee spending, budgets, and financial activity.",
 };
 
 export default function RootLayout({
