@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "item": "Basmati rice 5kg",
+      "quantity": "1",
+      "amount": "3250"
+    },
+    {
+      "item": "Fresh milk 1L",
+      "quantity": "2",
+      "amount": "1080"
+    },
+    {
+      "item": "Vegetables bundle",
+      "quantity": "1",
+      "amount": "1450"
+    },
+    {
+      "item": "Dishwashing liquid",
+      "quantity": "1",
+      "amount": "720"
+    }
+  ],
+  "totals": {
+    "subtotal": "6500",
+    "discount": "250",
+    "tax": "0",
+    "serviceCharge": "0",
+    "deliveryFee": "0",
+    "total": "6250"
+  }
+}

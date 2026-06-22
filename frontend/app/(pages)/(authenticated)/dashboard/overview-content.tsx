@@ -2,26 +2,16 @@
 
 import { LineChart } from "@mui/x-charts/LineChart";
 import { useMemo } from "react";
+import expenseTrend from "@/fake-data/expense-trend.json";
 import { useReceipts } from "../../../_lib/use-receipts";
 
 type OverviewContentProps = {
   userEmail: string;
 };
 
-const mockExpenseTrend = [
-  { date: "May 01", amount: 4200 },
-  { date: "May 05", amount: 7800 },
-  { date: "May 09", amount: 11600 },
-  { date: "May 13", amount: 15100 },
-  { date: "May 17", amount: 20400 },
-  { date: "May 21", amount: 25700 },
-  { date: "May 25", amount: 31800 },
-  { date: "May 29", amount: 38000 },
-  { date: "May 31", amount: 50000 },
-];
-
 export default function OverviewContent({ userEmail }: OverviewContentProps) {
-  const { error, loading, receipts, totalSpent } = useReceipts(userEmail);
+  const { dataSource, error, loading, receipts, totalSpent } =
+    useReceipts(userEmail);
 
   const summary = useMemo(() => {
     const latestReceipt = receipts
@@ -30,7 +20,10 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
 
     return {
       latestDate: latestReceipt?.created_at || null,
-      latestPreview: latestReceipt?.emailBody.preview || "No receipts yet",
+      latestPreview:
+        latestReceipt?.emailBody?.preview ||
+        latestReceipt?.items?.[0]?.item ||
+        "No receipts yet",
     };
   }, [receipts]);
 
@@ -94,7 +87,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
             {formatAmount(totalSpent)}
           </p>
           <p className="mt-2 text-sm font-medium text-primary">
-            Current total from backend
+            Current total from {dataSource === "fake" ? "fake data" : "backend"}
           </p>
         </article>
       </div>
@@ -103,7 +96,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
         <div className="mb-4">
           <h2 className="text-lg font-semibold">Expense trend</h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Mock monthly spend by date
+            Monthly spend by date
           </p>
         </div>
         <div className="h-[300px]">
@@ -114,7 +107,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
             margin={{ right: 24, top: 30 }}
             series={[
               {
-                data: mockExpenseTrend.map((point) => point.amount),
+                data: expenseTrend.map((point) => point.amount),
                 label: "Amount",
                 valueFormatter: (value) =>
                   value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
@@ -144,7 +137,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
             }}
             xAxis={[
               {
-                data: mockExpenseTrend.map((point) => point.date),
+                data: expenseTrend.map((point) => point.date),
                 label: "Date",
                 labelStyle: {
                   fill: "var(--text-primary)",

@@ -1,7 +1,8 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import fakeExtractedReceipt from "@/fake-data/extracted-receipt.json";
 import { useReceiptsRefresh } from "../_lib/receipts-refresh-context";
 
 type ReceiptFile = {
@@ -12,22 +13,64 @@ type ReceiptFile = {
   type: string;
 };
 
+type ExtractedReceiptItem = {
+  amount: string;
+  item: string;
+  quantity: string;
+};
+
+type ExtractedReceiptTotals = typeof fakeExtractedReceipt.totals;
+type ExtractedReceipt = {
+  items: ExtractedReceiptItem[];
+  totals: ExtractedReceiptTotals;
+};
+
 const acceptedFileTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+const defaultExtractedTotals = fakeExtractedReceipt.totals;
+const editableTotalFields = ["discount", "tax", "serviceCharge", "deliveryFee"] as const;
 
 export default function ReceiptImportModal() {
   const { refreshReceipts } = useReceiptsRefresh();
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [files, setFiles] = useState<ReceiptFile[]>([]);
   const [emailBody, setEmailBody] = useState("");
   const [extractError, setExtractError] = useState("");
+  const [extractedItems, setExtractedItems] = useState<ExtractedReceiptItem[]>(
+    [],
+  );
+  const [extractedTotals, setExtractedTotals] =
+    useState<ExtractedReceiptTotals | null>(null);
   const shouldRefreshOnCloseRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const subtotal = useMemo(
+    () =>
+      extractedItems.reduce(
+        (total, item) => total + parseAmountInput(item.amount),
+        0,
+      ),
+    [extractedItems],
+  );
+  const finalTotal = useMemo(() => {
+    if (!extractedTotals) {
+      return 0;
+    }
+
+    return (
+      subtotal -
+      parseAmountInput(extractedTotals.discount) +
+      parseAmountInput(extractedTotals.tax) +
+      parseAmountInput(extractedTotals.serviceCharge) +
+      parseAmountInput(extractedTotals.deliveryFee)
+    );
+  }, [extractedTotals, subtotal]);
 
   function addFiles(fileList: FileList | File[]) {
-    const nextFiles = Array.from(fileList)
+    const nextFiles: ReceiptFile[] = Array.from(fileList)
       .filter((file) => acceptedFileTypes.includes(file.type))
+      .slice(0, 1)
       .map((file) => ({
         file,
         id: `${file.name}-${file.size}-${file.lastModified}`,
@@ -36,23 +79,28 @@ export default function ReceiptImportModal() {
         type: file.type || "Unknown",
       }));
 
-    setFiles((currentFiles) => {
-      const currentIds = new Set(currentFiles.map((file) => file.id));
-      const uniqueFiles = nextFiles.filter((file) => !currentIds.has(file.id));
+    setFiles(nextFiles);
 
-      return [...currentFiles, ...uniqueFiles];
-    });
+    return nextFiles;
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragging(false);
-    addFiles(event.dataTransfer.files);
+    const addedFiles = addFiles(event.dataTransfer.files);
+
+    if (addedFiles.length > 0) {
+      void importReceipts(addedFiles);
+    }
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     if (event.target.files) {
-      addFiles(event.target.files);
+      const addedFiles = addFiles(event.target.files);
+
+      if (addedFiles.length > 0) {
+        void importReceipts(addedFiles);
+      }
     }
   }
 
@@ -60,12 +108,16 @@ export default function ReceiptImportModal() {
     setFiles((currentFiles) =>
       currentFiles.filter((file) => file.id !== fileId),
     );
+    setExtractedItems([]);
+    setExtractedTotals(null);
   }
 
   function resetForm() {
     setFiles([]);
     setEmailBody("");
     setExtractError("");
+    setExtractedItems([]);
+    setExtractedTotals(null);
     setIsDragging(false);
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -82,14 +134,16 @@ export default function ReceiptImportModal() {
     setIsOpen(false);
   }
 
-  async function importReceipts() {
+  async function importReceipts(receiptFiles = files) {
     setIsUploading(true);
     setExtractError("");
+    setExtractedItems([]);
+    setExtractedTotals(null);
 
     try {
       const formData = new FormData();
 
-      for (const receiptFile of files) {
+      for (const receiptFile of receiptFiles) {
         formData.append("files", receiptFile.file, receiptFile.name);
       }
 
@@ -105,9 +159,16 @@ export default function ReceiptImportModal() {
         throw new Error(data.error ?? "Receipt extraction failed.");
       }
 
-      shouldRefreshOnCloseRef.current = true;
-      toast.success("Receipts imported successfully");
-      closeModal();
+      const extractedReceipt =
+        "extractedReceipt" in data
+          ? (data.extractedReceipt as ExtractedReceipt)
+          : fakeExtractedReceipt;
+
+      const normalizedReceipt = normalizeExtractedReceipt(extractedReceipt);
+
+      setExtractedItems(normalizedReceipt.items);
+      setExtractedTotals(normalizedReceipt.totals);
+      toast.success("Receipt imported. Review the extracted details below.");
     } catch (error) {
       setExtractError(
         error instanceof Error ? error.message : "Receipt extraction failed.",
@@ -115,6 +176,68 @@ export default function ReceiptImportModal() {
     } finally {
       setIsUploading(false);
     }
+  }
+
+  async function saveReceipt() {
+    if (!extractedTotals) {
+      return;
+    }
+
+    setIsSaving(true);
+    setExtractError("");
+
+    try {
+      const response = await fetch("/api/receipts", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: extractedItems,
+          totals: {
+            ...extractedTotals,
+            subtotal: formatAmountInput(subtotal),
+            total: formatAmountInput(finalTotal),
+          },
+        }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Unable to save receipt.");
+      }
+
+      shouldRefreshOnCloseRef.current = true;
+      toast.success("Receipt saved");
+      closeModal();
+    } catch (error) {
+      setExtractError(
+        error instanceof Error ? error.message : "Unable to save receipt.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function updateExtractedItem(
+    index: number,
+    field: keyof ExtractedReceiptItem,
+    value: string,
+  ) {
+    setExtractedItems((currentItems) =>
+      currentItems.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  }
+
+  function updateExtractedTotal(
+    field: keyof ExtractedReceiptTotals,
+    value: string,
+  ) {
+    setExtractedTotals((currentTotals) =>
+      currentTotals ? { ...currentTotals, [field]: value } : currentTotals,
+    );
   }
 
   return (
@@ -171,10 +294,10 @@ export default function ReceiptImportModal() {
                   +
                 </div>
                 <p className="mt-4 text-base font-semibold text-text-primary">
-                  Drag and drop receipts
+                  Drag and drop a receipt
                 </p>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-text-secondary">
-                  PDFs, screenshots, photos, and exported receipt images are
+                  One PDF, screenshot, photo, or exported receipt image is
                   accepted.
                 </p>
                 <button
@@ -182,12 +305,11 @@ export default function ReceiptImportModal() {
                   onClick={() => inputRef.current?.click()}
                   type="button"
                 >
-                  Choose files
+                  Choose file
                 </button>
                 <input
                   accept="application/pdf,image/jpeg,image/png,image/webp"
                   className="hidden"
-                  multiple
                   onChange={handleFileChange}
                   ref={inputRef}
                   type="file"
@@ -209,7 +331,7 @@ export default function ReceiptImportModal() {
               {files.length > 0 ? (
                 <div className="rounded-[8px] border border-border">
                   <div className="border-b border-border px-4 py-3 text-sm font-medium">
-                    Selected files
+                    Selected file
                   </div>
                   <div className="divide-y divide-border">
                     {files.map((file) => (
@@ -243,6 +365,124 @@ export default function ReceiptImportModal() {
                   {extractError}
                 </div>
               ) : null}
+
+              {extractedTotals ? (
+                <div className="rounded-[8px] border border-border">
+                  <div className="border-b border-border px-4 py-3">
+                    <h3 className="text-sm font-semibold text-text-primary">
+                      Extracted receipt details
+                    </h3>
+                    <p className="mt-1 text-xs text-text-secondary">
+                      These values are editable before you save the receipt.
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-secondary">
+                          <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                            Item
+                          </th>
+                          <th className="w-32 px-4 py-3 text-left font-medium text-text-secondary">
+                            Quantity
+                          </th>
+                          <th className="w-40 px-4 py-3 text-left font-medium text-text-secondary">
+                            Amount
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {extractedItems.map((item, index) => (
+                          <tr className="border-b border-border" key={index}>
+                            <td className="px-4 py-3">
+                              <input
+                                className="h-10 w-full rounded-[8px] border border-border bg-secondary px-3 text-sm text-text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                                onChange={(event) =>
+                                  updateExtractedItem(
+                                    index,
+                                    "item",
+                                    event.target.value,
+                                  )
+                                }
+                                value={item.item}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                className="h-10 w-full rounded-[8px] border border-border bg-secondary px-3 text-sm text-text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                                onChange={(event) =>
+                                  updateExtractedItem(
+                                    index,
+                                    "quantity",
+                                    event.target.value,
+                                  )
+                                }
+                                value={item.quantity}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                className="h-10 w-full rounded-[8px] border border-border bg-secondary px-3 text-sm text-text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                                onChange={(event) =>
+                                  updateExtractedItem(
+                                    index,
+                                    "amount",
+                                    event.target.value,
+                                  )
+                                }
+                                value={item.amount}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-text-secondary">
+                        Subtotal
+                      </span>
+                      <input
+                        className="h-10 w-full rounded-[8px] border border-border bg-surface-muted px-3 text-sm text-text-primary outline-none"
+                        readOnly
+                        value={formatAmountInput(subtotal)}
+                      />
+                    </label>
+
+                    {editableTotalFields.map((field) => (
+                      <label className="block" key={field}>
+                        <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-text-secondary">
+                          {formatTotalLabel(field)}
+                        </span>
+                        <input
+                          className="h-10 w-full rounded-[8px] border border-border bg-secondary px-3 text-sm text-text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                          onChange={(event) =>
+                            updateExtractedTotal(
+                              field as keyof ExtractedReceiptTotals,
+                              event.target.value,
+                            )
+                          }
+                          value={extractedTotals[field]}
+                        />
+                      </label>
+                    ))}
+
+                    <label className="block sm:col-span-2">
+                      <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-text-secondary">
+                        Total
+                      </span>
+                      <input
+                        className="h-10 w-full rounded-[8px] border border-border bg-surface-muted px-3 text-sm font-semibold text-text-primary outline-none"
+                        readOnly
+                        value={formatAmountInput(finalTotal)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-col-reverse gap-3 border-t border-border px-6 py-5 sm:flex-row sm:justify-end">
@@ -251,18 +491,28 @@ export default function ReceiptImportModal() {
                 onClick={closeModal}
                 type="button"
               >
-                Cancel
+                {extractedTotals ? "Close" : "Cancel"}
               </button>
               <button
                 className="h-10 rounded-[8px] bg-primary px-4 text-sm font-semibold text-text-button transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
                   isUploading ||
-                  (files.length === 0 && emailBody.trim().length === 0)
+                  isSaving ||
+                  (!extractedTotals &&
+                    files.length === 0 &&
+                    emailBody.trim().length === 0)
                 }
-                onClick={importReceipts}
+                onClick={() =>
+                  extractedTotals ? void saveReceipt() : void importReceipts()
+                }
                 type="button"
               >
-                {isUploading ? "Importing..." : "Import receipts"}
+                {isUploading ? "Importing..." : null}
+                {isSaving ? "Saving..." : null}
+                {!isUploading && !isSaving && extractedTotals ? "Done" : null}
+                {!isUploading && !isSaving && !extractedTotals
+                  ? "Import receipt"
+                  : null}
               </button>
             </div>
           </div>
@@ -282,4 +532,59 @@ function formatFileSize(bytes: number) {
   }
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatTotalLabel(label: string) {
+  return label.replace(/([A-Z])/g, " $1").replace(/^./, (character) =>
+    character.toUpperCase(),
+  );
+}
+
+function parseAmountInput(value: string) {
+  const numericValue = Number(value.replace(/,/g, "").replace(/[^\d.-]/g, ""));
+
+  return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function formatAmountInput(value: number) {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  });
+}
+
+function normalizeAmountInput(value: string) {
+  return value.replace(/\s*rs$/i, "").replace(/[^\d.,-]/g, "").trim();
+}
+
+function normalizeExtractedReceipt(receipt: ExtractedReceipt): ExtractedReceipt {
+  const fallbackReceipt = fakeExtractedReceipt;
+
+  return {
+    items: (receipt.items ?? fallbackReceipt.items).map((item) => ({
+      ...item,
+      amount: normalizeAmountInput(item.amount),
+      quantity: normalizeAmountInput(item.quantity),
+    })),
+    totals: {
+      ...defaultExtractedTotals,
+      ...(receipt.totals ?? fallbackReceipt.totals),
+      discount: normalizeAmountInput(
+        receipt.totals?.discount ?? fallbackReceipt.totals.discount,
+      ),
+      tax: normalizeAmountInput(receipt.totals?.tax ?? fallbackReceipt.totals.tax),
+      serviceCharge: normalizeAmountInput(
+        receipt.totals?.serviceCharge ?? fallbackReceipt.totals.serviceCharge,
+      ),
+      deliveryFee: normalizeAmountInput(
+        receipt.totals?.deliveryFee ?? fallbackReceipt.totals.deliveryFee,
+      ),
+      subtotal: formatAmountInput(
+        (receipt.items ?? fallbackReceipt.items).reduce(
+          (total, item) => total + parseAmountInput(item.amount),
+          0,
+        ),
+      ),
+      total: "",
+    },
+  };
 }
