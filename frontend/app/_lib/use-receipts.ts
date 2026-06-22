@@ -35,7 +35,8 @@ export type Receipt = {
   };
   total_amount: string;
   total_amount_value?: number;
-  expense_name: string;
+  store_name?: string;
+  expense_name?: string;
   type: string;
 };
 

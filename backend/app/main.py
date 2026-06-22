@@ -56,11 +56,13 @@ class ReceiptTotals(BaseModel):
 
 class SaveReceiptRequest(BaseModel):
     userEmail: str
+    storeName: str
     items: list[ReceiptItem]
     totals: ReceiptTotals
 
 
 FAKE_EXTRACTED_RECEIPT = {
+    "storeName": "Keells Super",
     "items": [
         {"item": "Basmati rice 5kg", "quantity": "1", "amount": "3250"},
         {"item": "Fresh milk 1L", "quantity": "2", "amount": "1080"},
@@ -136,7 +138,7 @@ async def save_receipt(receipt: SaveReceiptRequest) -> dict:
         "items": receipt_items,
         "totals": receipt_totals,
         "created_at": datetime.utcnow().isoformat(),
-        "expense_name": receipt_items[0]["item"] if receipt_items else "Receipt",
+        "store_name": receipt.storeName,
         "type": "Receipt",
         "total_amount": receipt_totals["total"],
         "total_amount_value": total_amount_value,

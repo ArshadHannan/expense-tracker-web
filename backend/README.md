@@ -98,6 +98,7 @@ POST /receipts
 ```json
 {
   "userEmail": "user@example.com",
+  "storeName": "Keells Super",
   "items": [
     { "item": "Basmati rice 5kg", "quantity": "1", "amount": "3250" }
   ],
@@ -122,4 +123,4 @@ users/
       {auto_id}
 ```
 
-Each receipt document contains the reviewed line items, totals, timestamp, and display fields. Uploaded file bytes, file metadata, and file counts are not saved in Firestore.
+Each receipt document contains `store_name`, reviewed line items, totals, timestamp, and display fields. Uploaded file bytes, file metadata, and file counts are not saved in Firestore.
