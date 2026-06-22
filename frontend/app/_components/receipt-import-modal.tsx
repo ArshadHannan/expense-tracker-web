@@ -22,6 +22,7 @@ type ExtractedReceiptItem = {
 type ExtractedReceiptTotals = typeof fakeExtractedReceipt.totals;
 type ExtractedReceipt = {
   items: ExtractedReceiptItem[];
+  storeName: string;
   totals: ExtractedReceiptTotals;
 };
 
@@ -38,6 +39,7 @@ export default function ReceiptImportModal() {
   const [files, setFiles] = useState<ReceiptFile[]>([]);
   const [emailBody, setEmailBody] = useState("");
   const [extractError, setExtractError] = useState("");
+  const [storeName, setStoreName] = useState("");
   const [extractedItems, setExtractedItems] = useState<ExtractedReceiptItem[]>(
     [],
   );
@@ -116,6 +118,7 @@ export default function ReceiptImportModal() {
     setFiles([]);
     setEmailBody("");
     setExtractError("");
+    setStoreName("");
     setExtractedItems([]);
     setExtractedTotals(null);
     setIsDragging(false);
@@ -166,6 +169,7 @@ export default function ReceiptImportModal() {
 
       const normalizedReceipt = normalizeExtractedReceipt(extractedReceipt);
 
+      setStoreName(normalizedReceipt.storeName);
       setExtractedItems(normalizedReceipt.items);
       setExtractedTotals(normalizedReceipt.totals);
       toast.success("Receipt imported. Review the extracted details below.");
@@ -193,6 +197,7 @@ export default function ReceiptImportModal() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          storeName,
           items: extractedItems,
           totals: {
             ...extractedTotals,
@@ -375,6 +380,19 @@ export default function ReceiptImportModal() {
                     <p className="mt-1 text-xs text-text-secondary">
                       These values are editable before you save the receipt.
                     </p>
+                  </div>
+
+                  <div className="border-b border-border p-4">
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-text-secondary">
+                        Store Name
+                      </span>
+                      <input
+                        className="h-10 w-full rounded-[8px] border border-border bg-secondary px-3 text-sm text-text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                        onChange={(event) => setStoreName(event.target.value)}
+                        value={storeName}
+                      />
+                    </label>
                   </div>
 
                   <div className="overflow-x-auto">
@@ -560,6 +578,7 @@ function normalizeExtractedReceipt(receipt: ExtractedReceipt): ExtractedReceipt 
   const fallbackReceipt = fakeExtractedReceipt;
 
   return {
+    storeName: receipt.storeName ?? fallbackReceipt.storeName,
     items: (receipt.items ?? fallbackReceipt.items).map((item) => ({
       ...item,
       amount: normalizeAmountInput(item.amount),
