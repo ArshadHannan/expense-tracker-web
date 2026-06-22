@@ -1,0 +1,38 @@
+[
+  {
+    "date": "Jun 01",
+    "amount": 1800
+  },
+  {
+    "date": "Jun 05",
+    "amount": 4200
+  },
+  {
+    "date": "Jun 09",
+    "amount": 7250
+  },
+  {
+    "date": "Jun 13",
+    "amount": 9800
+  },
+  {
+    "date": "Jun 17",
+    "amount": 12200
+  },
+  {
+    "date": "Jun 21",
+    "amount": 18450
+  },
+  {
+    "date": "Jun 25",
+    "amount": 22400
+  },
+  {
+    "date": "Jun 29",
+    "amount": 28600
+  },
+  {
+    "date": "Jun 30",
+    "amount": 31800
+  }
+]

@@ -4,10 +4,10 @@ FastAPI service for receipt extraction with Firebase Firestore integration.
 
 ## Features
 
-- Receives uploaded PDF/image files from frontend
+- Receives one uploaded PDF/image file from frontend for extraction
 - Processes receipt email body
 - Authenticates via Google Sign-in (forwarded from Next.js)
-- Saves receipt data to Firebase Firestore
+- Saves reviewed receipt line items and totals to Firebase Firestore
 - Real-time database collection per user
 
 ## Setup Firestore Connection
@@ -62,20 +62,53 @@ POST /extract-receipt
 ```
 
 **Request:**
-- `files` (File): PDF/image files
+- `files` (File): one PDF/image file
 - `emailBody` (Form): Receipt email text
 - `userEmail` (Form): Authenticated user email
 
 **Response:**
 ```json
 {
-  "status": "received",
+  "status": "extracted",
   "userEmail": "user@example.com",
-  "fileCount": 1,
-  "files": [...],
+  "receiptName": "receipt.pdf",
   "emailBody": {...},
-  "created_at": "2026-05-11T10:30:00.000000",
-  "saved_to_firestore": true
+  "extractedReceipt": {
+    "items": [
+      { "item": "Basmati rice 5kg", "quantity": "1", "amount": "3250" }
+    ],
+    "totals": {
+      "subtotal": "6500",
+      "discount": "250",
+      "tax": "0",
+      "serviceCharge": "0",
+      "deliveryFee": "0",
+      "total": "6250"
+    }
+  }
+}
+```
+
+### Save Reviewed Receipt
+```
+POST /receipts
+```
+
+**Request:**
+```json
+{
+  "userEmail": "user@example.com",
+  "items": [
+    { "item": "Basmati rice 5kg", "quantity": "1", "amount": "3250" }
+  ],
+  "totals": {
+    "subtotal": "6500",
+    "discount": "250",
+    "tax": "0",
+    "serviceCharge": "0",
+    "deliveryFee": "0",
+    "total": "6250"
+  }
 }
 ```
 
@@ -89,4 +122,4 @@ users/
       {auto_id}
 ```
 
-Each receipt document contains the extracted data with a timestamp.
+Each receipt document contains the reviewed line items, totals, timestamp, and display fields. Uploaded file bytes, file metadata, and file counts are not saved in Firestore.

@@ -1,5 +1,4 @@
 import os
-import json
 from datetime import datetime
 from typing import Annotated
 from dotenv import load_dotenv
@@ -7,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, UploadFile, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -39,6 +39,45 @@ except Exception as e:
     db = None
 
 
+class ReceiptItem(BaseModel):
+    item: str
+    quantity: str
+    amount: str
+
+
+class ReceiptTotals(BaseModel):
+    subtotal: str
+    discount: str
+    tax: str
+    serviceCharge: str
+    deliveryFee: str
+    total: str
+
+
+class SaveReceiptRequest(BaseModel):
+    userEmail: str
+    items: list[ReceiptItem]
+    totals: ReceiptTotals
+
+
+FAKE_EXTRACTED_RECEIPT = {
+    "items": [
+        {"item": "Basmati rice 5kg", "quantity": "1", "amount": "3250"},
+        {"item": "Fresh milk 1L", "quantity": "2", "amount": "1080"},
+        {"item": "Vegetables bundle", "quantity": "1", "amount": "1450"},
+        {"item": "Dishwashing liquid", "quantity": "1", "amount": "720"},
+    ],
+    "totals": {
+        "subtotal": "6500",
+        "discount": "250",
+        "tax": "0",
+        "serviceCharge": "0",
+        "deliveryFee": "0",
+        "total": "6250",
+    },
+}
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
@@ -50,67 +89,85 @@ async def extract_receipt(
     emailBody: Annotated[str, Form()] = "",
     userEmail: Annotated[str, Form()] = "",
 ) -> dict:
-    uploaded_files = []
+    uploaded_files = files or []
 
-    for file in files or []:
-        content = await file.read()
-        uploaded_files.append(
-            {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "size_bytes": len(content),
-            }
+    if len(uploaded_files) > 1:
+        return JSONResponse(
+            {"error": "Only one receipt can be uploaded at a time."},
+            status_code=400,
         )
 
-    receipt_data = {
-        "status": "received",
+    for file in uploaded_files:
+        await file.read()
+
+    return {
+        "status": "extracted",
         "userEmail": userEmail,
-        "fileCount": len(uploaded_files),
-        "files": uploaded_files,
+        "receiptName": uploaded_files[0].filename if uploaded_files else "Email Receipt",
         "emailBody": {
             "received": bool(emailBody.strip()),
             "characterCount": len(emailBody),
             "preview": emailBody[:300],
         },
-        "created_at": datetime.utcnow().isoformat(),
-        "total_amount": "1000 Rs",
-        "total_amount_value": 1000,
+        "extractedReceipt": FAKE_EXTRACTED_RECEIPT,
     }
 
-    if uploaded_files:
-        receipt_data["expense_name"] = uploaded_files[0]["filename"]
-        content_type = uploaded_files[0]["content_type"]
-        if content_type == "application/pdf":
-            receipt_data["type"] = "PDF"
-        else:
-            receipt_data["type"] = "Image"
-    else:
-        receipt_data["expense_name"] = "Email Receipt"
-        receipt_data["type"] = "Email"
 
-    # Save to Firestore if available, and update running total
-    if db and userEmail:
-        try:
-            db.collection("users").document(userEmail).collection("receipts").add(
-                receipt_data
-            )
-            db.collection("users").document(userEmail).set(
-                {"total_spent": firestore.Increment(1000)},
-                merge=True,
-            )
-            receipt_data["saved_to_firestore"] = True
-        except Exception as e:
-            print(f"Error saving to Firestore: {e}")
-            receipt_data["saved_to_firestore"] = False
-            receipt_data["error"] = str(e)
-    else:
-        receipt_data["saved_to_firestore"] = False
-        if not db:
-            receipt_data["warning"] = "Firebase not initialized"
-        if not userEmail:
-            receipt_data["warning"] = "User email required to save"
+@app.post("/receipts")
+async def save_receipt(receipt: SaveReceiptRequest) -> dict:
+    if not db:
+        return JSONResponse(
+            {"error": "Firebase not initialized", "saved_to_firestore": False},
+            status_code=500,
+        )
 
-    return receipt_data
+    if not receipt.userEmail:
+        return JSONResponse(
+            {"error": "User email required", "saved_to_firestore": False},
+            status_code=400,
+        )
+
+    receipt_items = [item.model_dump() for item in receipt.items]
+    receipt_totals = receipt.totals.model_dump()
+    total_amount_value = parse_amount(receipt_totals["total"])
+    receipt_data = {
+        "status": "saved",
+        "userEmail": receipt.userEmail,
+        "items": receipt_items,
+        "totals": receipt_totals,
+        "created_at": datetime.utcnow().isoformat(),
+        "expense_name": receipt_items[0]["item"] if receipt_items else "Receipt",
+        "type": "Receipt",
+        "total_amount": receipt_totals["total"],
+        "total_amount_value": total_amount_value,
+    }
+
+    try:
+        db.collection("users").document(receipt.userEmail).collection("receipts").add(
+            receipt_data
+        )
+        db.collection("users").document(receipt.userEmail).set(
+            {"total_spent": firestore.Increment(total_amount_value)},
+            merge=True,
+        )
+        receipt_data["saved_to_firestore"] = True
+        return receipt_data
+    except Exception as e:
+        print(f"Error saving to Firestore: {e}")
+        return JSONResponse(
+            {
+                "error": str(e),
+                "saved_to_firestore": False,
+            },
+            status_code=500,
+        )
+
+
+def parse_amount(value: str) -> float:
+    try:
+        return float(value.replace(",", "").strip())
+    except ValueError:
+        return 0
 
 
 @app.get("/receipts")
