@@ -1,4 +1,4 @@
-# Expense Tracker Backend
+# RupeeFlow Backend
 
 FastAPI service for receipt extraction with Firebase Firestore integration.
 

@@ -13,7 +13,7 @@ from firebase_admin import credentials, firestore
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="Expense Tracker Receipt Extractor")
+app = FastAPI(title="RupeeFlow Receipt Extractor")
 
 # Configure CORS
 app.add_middleware(
