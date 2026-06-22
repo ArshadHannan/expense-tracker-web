@@ -76,10 +76,10 @@ export default async function LoginPage({
               <span className="h-px flex-1 bg-border" />
             </div>
 
-            <div className="rounded-[8px] border border-border bg-primary-soft p-4 text-sm leading-6 text-text-secondary">
+            {/* <div className="rounded-[8px] border border-border bg-primary-soft p-4 text-sm leading-6 text-text-secondary">
               Google authentication is enabled for this app. Configure your
               Google OAuth client credentials in the environment file.
-            </div>
+            </div> */}
           </div>
         </section>
       </div>
