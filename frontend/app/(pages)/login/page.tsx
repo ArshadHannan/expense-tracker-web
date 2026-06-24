@@ -31,27 +31,14 @@ export default async function LoginPage({
 
   return (
     <main className="min-h-screen bg-background text-text-primary">
-      <header className="border-b border-border bg-surface/80 px-6 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
-              RF
-            </div>
-            <div>
-              <p className="font-semibold">RupeeFlow</p>
-              <p className="text-xs text-text-secondary">Rupee console</p>
-            </div>
-          </div>
-
-          <LoginButton label="Log in" compact />
-        </div>
-      </header>
-
       <section className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
         <div>
-          <p className="text-sm font-medium text-primary">
+          <div className="text-sm font-medium text-primary">
+             <div className="mb-5 grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
+              RF
+            </div>
             Receipt-to-expense workflow
-          </p>
+          </div>
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-normal sm:text-5xl">
             A clearer way to turn receipts into trusted expense records.
           </h1>
