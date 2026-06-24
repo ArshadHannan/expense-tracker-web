@@ -1,9 +1,10 @@
 import os
+import secrets
 from datetime import datetime
 from typing import Annotated
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, File, Form, UploadFile, Query
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,6 +15,28 @@ from firebase_admin import credentials, firestore
 load_dotenv()
 
 app = FastAPI(title="RupeeFlow Receipt Extractor")
+
+BACKEND_API_SECRET = os.getenv("BACKEND_API_SECRET")
+
+
+def verify_backend_api_secret(
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    if not BACKEND_API_SECRET:
+        if os.getenv("VERCEL"):
+            raise HTTPException(
+                status_code=503,
+                detail="Backend API secret is not configured.",
+            )
+        return
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    token = authorization.removeprefix("Bearer ")
+    if not secrets.compare_digest(token, BACKEND_API_SECRET):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 
 # Configure CORS
 frontend_origins = os.getenv("FRONTEND_ORIGINS")
@@ -103,6 +126,7 @@ async def extract_receipt(
     files: Annotated[list[UploadFile] | None, File()] = None,
     emailBody: Annotated[str, Form()] = "",
     userEmail: Annotated[str, Form()] = "",
+    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
 ) -> dict:
     uploaded_files = files or []
 
@@ -129,7 +153,10 @@ async def extract_receipt(
 
 
 @app.post("/receipts")
-async def save_receipt(receipt: SaveReceiptRequest) -> dict:
+async def save_receipt(
+    receipt: SaveReceiptRequest,
+    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
+) -> dict:
     if not db:
         return JSONResponse(
             {"error": "Firebase not initialized", "saved_to_firestore": False},
@@ -186,7 +213,10 @@ def parse_amount(value: str) -> float:
 
 
 @app.get("/receipts")
-async def get_receipts(userEmail: str = Query(...)) -> dict:
+async def get_receipts(
+    userEmail: str = Query(...),
+    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
+) -> dict:
     """Fetch all receipts for a user, sorted by date (newest first)"""
     if not db:
         return JSONResponse(
