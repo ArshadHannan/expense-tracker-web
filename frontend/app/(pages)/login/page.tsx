@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const features = [
   {
     title: "Receipt review before saving",
@@ -202,14 +204,12 @@ function LoginButton({
   return (
     <form action="/auth/google" method="GET">
       <button
-        className={`flex items-center justify-center gap-3 rounded-[8px] bg-primary text-sm font-semibold text-text-button transition hover:bg-primary-dark focus:outline-none focus:ring-4 focus:ring-primary/25 ${
+        className={`flex items-center justify-center gap-3 rounded-[8px] bg-primary-dark text-sm font-semibold text-text-button transition focus:outline-none focus:ring-4 focus:ring-primary/25 ${
           compact ? "h-10 px-4" : "h-11 px-5"
         }`}
         type="submit"
       >
-        <span className="grid size-6 place-items-center rounded-full bg-text-primary text-sm font-bold text-text-button">
-          G
-        </span>
+          <Image src="/google.svg" alt="Google logo" width={24} height={24} />
         {label}
       </button>
     </form>
