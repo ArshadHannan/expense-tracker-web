@@ -16,9 +16,14 @@ load_dotenv()
 app = FastAPI(title="RupeeFlow Receipt Extractor")
 
 # Configure CORS
+frontend_origins = os.getenv("FRONTEND_ORIGINS")
+if frontend_origins:
+    origins = [o.strip() for o in frontend_origins.split(",") if o.strip()]
+else:
+    origins = ["http://localhost:3000"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,12 +32,20 @@ app.add_middleware(
 # Initialize Firebase
 try:
     cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "./firebase-credentials.json")
-    if os.path.exists(cred_path):
+    firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if firebase_creds_json:
+        import json
+
+        cred_dict = json.loads(firebase_creds_json)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+        db = firestore.client()
+    elif os.path.exists(cred_path):
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
         db = firestore.client()
     else:
-        print(f"⚠️  Firebase credentials not found at {cred_path}")
+        print(f"⚠️  Firebase credentials not found. Set FIREBASE_CREDENTIALS_JSON or provide a file at {cred_path}")
         db = None
 except Exception as e:
     print(f"⚠️  Firebase initialization failed: {e}")
