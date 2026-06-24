@@ -55,9 +55,7 @@ export function useReceipts(userEmail: string) {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(
-          `/api/receipts?userEmail=${encodeURIComponent(userEmail)}`,
-        );
+        const response = await fetch("/api/receipts");
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);

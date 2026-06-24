@@ -64,20 +64,29 @@ function getMissingBackendUrlResponse() {
   );
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const userEmail = searchParams.get("userEmail");
+function getBackendAuthHeaders(
+  extraHeaders: Record<string, string> = {},
+): Record<string, string> {
+  const headers = { ...extraHeaders };
+  const secret = process.env.BACKEND_API_SECRET;
 
-  if (!userEmail) {
-    return NextResponse.json(
-      { error: "User email is required" },
-      { status: 400 },
-    );
+  if (secret) {
+    headers.Authorization = `Bearer ${secret}`;
+  }
+
+  return headers;
+}
+
+export async function GET() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     if (shouldUseFakeData()) {
-      return NextResponse.json(getFakeReceiptsResponse(userEmail));
+      return NextResponse.json(getFakeReceiptsResponse(user.email));
     }
 
     const backendUrl = getBackendReceiptsUrl();
@@ -87,12 +96,12 @@ export async function GET(request: NextRequest) {
     }
 
     const backendResponse = await fetch(
-      `${backendUrl}?userEmail=${encodeURIComponent(userEmail)}`,
+      `${backendUrl}?userEmail=${encodeURIComponent(user.email)}`,
       {
         method: "GET",
-        headers: {
+        headers: getBackendAuthHeaders({
           "Content-Type": "application/json",
-        },
+        }),
       },
     );
 
@@ -163,6 +172,7 @@ export async function POST(request: NextRequest) {
 
     const backendResponse = await fetch(backendUrl, {
       method: "POST",
+      headers: getBackendAuthHeaders(),
       body: outgoingFormData,
     });
     const contentType = backendResponse.headers.get("content-type") ?? "";
@@ -225,9 +235,9 @@ export async function PATCH(request: NextRequest) {
 
     const backendResponse = await fetch(backendUrl, {
       method: "POST",
-      headers: {
+      headers: getBackendAuthHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         ...receiptData,
         userEmail: user.email,
