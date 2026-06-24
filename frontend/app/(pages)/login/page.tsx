@@ -37,7 +37,7 @@ export default async function LoginPage({
              <div className="mb-5 grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
               RF
             </div>
-            Receipt-to-expense workflow
+            Rupee Flow
           </div>
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-normal sm:text-5xl">
             A clearer way to turn receipts into trusted expense records.
