@@ -1,20 +1,19 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, useRef, useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { toast } from "sonner";
 import fakeExtractedReceipt from "@/fake-data/extracted-receipt.json";
 import { useReceiptsRefresh } from "../_lib/receipts-refresh-context";
 import { useReceiptImport } from "../_lib/receipt-import-context";
 import {
-  computeFinalTotal,
-  computeSubtotal,
   formatAmountInput,
   normalizeAmountInput,
   saveReceipt,
   type ReceiptItem,
   type ReceiptTotals,
 } from "../_lib/receipt-form-utils";
+import { useReceiptForm } from "../_lib/use-receipt-form";
 import ReceiptDetailsForm from "./receipt-details-form";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
@@ -47,28 +46,16 @@ const defaultExtractedTotals = fakeExtractedReceipt.totals;
 export default function ReceiptImportModal() {
   const { isOpen, close: closeImport } = useReceiptImport();
   const { refreshReceipts } = useReceiptsRefresh();
+  const form = useReceiptForm();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [files, setFiles] = useState<ReceiptFile[]>([]);
   const [emailBody, setEmailBody] = useState("");
   const [extractError, setExtractError] = useState("");
-  const [storeName, setStoreName] = useState("");
-  const [extractedItems, setExtractedItems] = useState<ReceiptItem[]>([]);
-  const [extractedTotals, setExtractedTotals] = useState<ReceiptTotals | null>(
-    null,
-  );
+  const [hasExtractedData, setHasExtractedData] = useState(false);
   const shouldRefreshOnCloseRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const subtotal = useMemo(
-    () => computeSubtotal(extractedItems),
-    [extractedItems],
-  );
-  const finalTotal = useMemo(() => {
-    if (!extractedTotals) return 0;
-    return computeFinalTotal(subtotal, extractedTotals);
-  }, [extractedTotals, subtotal]);
 
   function addFiles(fileList: FileList | File[]) {
     const nextFiles: ReceiptFile[] = Array.from(fileList)
@@ -110,17 +97,16 @@ export default function ReceiptImportModal() {
     setFiles((currentFiles) =>
       currentFiles.filter((file) => file.id !== fileId),
     );
-    setExtractedItems([]);
-    setExtractedTotals(null);
+    form.reset();
+    setHasExtractedData(false);
   }
 
   function resetForm() {
     setFiles([]);
     setEmailBody("");
     setExtractError("");
-    setStoreName("");
-    setExtractedItems([]);
-    setExtractedTotals(null);
+    form.reset();
+    setHasExtractedData(false);
     setIsDragging(false);
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -140,8 +126,8 @@ export default function ReceiptImportModal() {
   async function importReceipts(receiptFiles = files) {
     setIsUploading(true);
     setExtractError("");
-    setExtractedItems([]);
-    setExtractedTotals(null);
+    form.reset();
+    setHasExtractedData(false);
 
     try {
       const formData = new FormData();
@@ -169,9 +155,12 @@ export default function ReceiptImportModal() {
 
       const normalizedReceipt = normalizeExtractedReceipt(extractedReceipt);
 
-      setStoreName(normalizedReceipt.storeName);
-      setExtractedItems(normalizedReceipt.items);
-      setExtractedTotals(normalizedReceipt.totals);
+      form.loadForm({
+        storeName: normalizedReceipt.storeName,
+        items: normalizedReceipt.items,
+        totals: normalizedReceipt.totals,
+      });
+      setHasExtractedData(true);
       toast.success("Receipt imported. Review the extracted details below.");
     } catch (error) {
       setExtractError(
@@ -183,22 +172,20 @@ export default function ReceiptImportModal() {
   }
 
   async function handleSaveReceipt() {
-    if (!extractedTotals) return;
+    const { isValid, errors, payload } = form.getSavePayload();
+
+    if (!isValid) {
+      setExtractError(
+        errors.form ?? "Fix the highlighted fields before saving.",
+      );
+      return;
+    }
 
     setIsSaving(true);
     setExtractError("");
 
     try {
-      await saveReceipt({
-        storeName,
-        items: extractedItems,
-        totals: {
-          ...extractedTotals,
-          subtotal: formatAmountInput(subtotal),
-          total: formatAmountInput(finalTotal),
-        },
-      });
-
+      await saveReceipt(payload);
       shouldRefreshOnCloseRef.current = true;
       toast.success("Receipt saved");
       closeModal();
@@ -211,28 +198,10 @@ export default function ReceiptImportModal() {
     }
   }
 
-  function updateExtractedItem(
-    index: number,
-    field: keyof ReceiptItem,
-    value: string,
-  ) {
-    setExtractedItems((currentItems) =>
-      currentItems.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item,
-      ),
-    );
-  }
-
-  function updateExtractedTotal(field: keyof ReceiptTotals, value: string) {
-    setExtractedTotals((currentTotals) =>
-      currentTotals ? { ...currentTotals, [field]: value } : currentTotals,
-    );
-  }
-
   return (
     <Modal
       description={
-        extractedTotals
+        hasExtractedData
           ? "Review and edit the extracted values before saving."
           : "Upload a receipt image or PDF to extract expense details."
       }
@@ -240,26 +209,26 @@ export default function ReceiptImportModal() {
       footer={
         <>
           <Button onClick={closeModal} variant="ghost">
-            {extractedTotals ? "Close" : "Cancel"}
+            {hasExtractedData ? "Close" : "Cancel"}
           </Button>
           <Button
             disabled={
               isUploading ||
               isSaving ||
-              (!extractedTotals &&
+              (!hasExtractedData &&
                 files.length === 0 &&
                 emailBody.trim().length === 0)
             }
             loading={isUploading || isSaving}
             onClick={() =>
-              extractedTotals ? void handleSaveReceipt() : void importReceipts()
+              hasExtractedData ? void handleSaveReceipt() : void importReceipts()
             }
           >
             {isUploading
               ? "Importing..."
               : isSaving
                 ? "Saving..."
-                : extractedTotals
+                : hasExtractedData
                   ? "Save receipt"
                   : "Import receipt"}
           </Button>
@@ -268,10 +237,10 @@ export default function ReceiptImportModal() {
       onClose={closeModal}
       open={isOpen}
       size="lg"
-      title={extractedTotals ? "Review extracted receipt" : "Import receipt"}
+      title={hasExtractedData ? "Review extracted receipt" : "Import receipt"}
     >
       <div className="space-y-5">
-        {!extractedTotals ? (
+        {!hasExtractedData ? (
           <>
             <div
               className={`flex min-h-44 flex-col items-center justify-center rounded-[var(--radius-lg)] border-2 border-dashed px-6 py-10 text-center transition-all duration-200 ${
@@ -313,9 +282,10 @@ export default function ReceiptImportModal() {
             </div>
 
             <Textarea
-              label="Receipt email body"
+              hint="Optional — paste email text if you don't have a file."
+              label="Receipt email body (optional)"
               onChange={(event) => setEmailBody(event.target.value)}
-              placeholder="Paste receipt details from an email here (optional)."
+              placeholder="Paste receipt details from an email here."
               value={emailBody}
             />
           </>
@@ -358,7 +328,7 @@ export default function ReceiptImportModal() {
 
         {extractError ? <Alert variant="error">{extractError}</Alert> : null}
 
-        {extractedTotals ? (
+        {hasExtractedData ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-text-primary">
@@ -368,14 +338,21 @@ export default function ReceiptImportModal() {
             </div>
 
             <ReceiptDetailsForm
-              finalTotal={finalTotal}
-              items={extractedItems}
-              onStoreNameChange={setStoreName}
-              onUpdateItem={updateExtractedItem}
-              onUpdateTotal={updateExtractedTotal}
-              storeName={storeName}
-              subtotal={subtotal}
-              totals={extractedTotals}
+              errors={form.errors}
+              finalTotal={form.finalTotal}
+              items={form.items}
+              onAddItem={form.addItem}
+              onReceiptDateChange={form.setReceiptDate}
+              onRemoveItem={form.removeItem}
+              onRowBlur={form.handleRowBlur}
+              onStoreNameChange={form.setStoreName}
+              onUpdateItem={form.updateItem}
+              onUpdateTotal={form.updateTotal}
+              receiptDate={form.receiptDate}
+              showErrors={form.showErrors}
+              storeName={form.storeName}
+              subtotal={form.subtotal}
+              totals={form.totals}
             />
           </div>
         ) : null}

@@ -1,7 +1,7 @@
-import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
-  label?: string;
+  label?: ReactNode;
   hint?: string;
   error?: string;
 };
@@ -11,7 +11,11 @@ const fieldStyles =
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, hint, error, className = "", id, ...props }, ref) => {
-    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+    const inputId =
+      id ??
+      (typeof label === "string"
+        ? label.toLowerCase().replace(/\s+/g, "-")
+        : undefined);
 
     return (
       <label className="block" htmlFor={inputId}>
