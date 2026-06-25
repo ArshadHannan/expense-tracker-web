@@ -1,17 +1,32 @@
 import Image from "next/image";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Receipt,
+  Shield,
+  Sparkles,
+  Table2,
+} from "lucide-react";
+import { Badge } from "../../_components/ui/badge";
+import { Button } from "../../_components/ui/button";
+import { Card } from "../../_components/ui/card";
+import { Alert } from "../../_components/ui/alert";
 
 const features = [
   {
+    icon: Receipt,
     title: "Receipt review before saving",
     description:
-      "Upload a receipt, review the extracted store, item, tax, discount, and total values, then save only after everything looks right.",
+      "Upload a receipt, review extracted store, item, tax, discount, and total values, then save only after everything looks right.",
   },
   {
+    icon: Table2,
     title: "Expense history in one table",
     description:
-      "Keep every saved receipt organized by store, amount, and date with quick access to the full receipt breakdown.",
+      "Keep every saved receipt organized by store, amount, and date with quick access to the full breakdown.",
   },
   {
+    icon: Shield,
     title: "Built for rupee tracking",
     description:
       "RupeeFlow keeps your spending workflow focused on practical day-to-day expense tracking.",
@@ -24,6 +39,24 @@ const previewItems = [
   { amount: "1,450", item: "Vegetables bundle", quantity: "1" },
 ];
 
+const steps = [
+  {
+    step: "01",
+    title: "Upload one receipt",
+    description: "Send one PDF or image for extraction.",
+  },
+  {
+    step: "02",
+    title: "Review extracted fields",
+    description: "Edit store name, items, discount, tax, and total before saving.",
+  },
+  {
+    step: "03",
+    title: "Save expense history",
+    description: "Store reviewed receipt details and view them from the expenses table.",
+  },
+];
+
 export default async function LoginPage({
   searchParams,
 }: {
@@ -32,207 +65,239 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
-        <div>
-          <div className="text-sm font-medium text-primary">
-             <div className="mb-5 grid size-10 place-items-center rounded-[8px] bg-primary text-lg font-bold text-text-button">
-              RF
-            </div>
-            Rupee Flow
-          </div>
-          <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-normal sm:text-5xl">
-            A clearer way to turn receipts into trusted expense records.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-text-secondary">
-            RupeeFlow helps you upload receipts, review the extracted line
-            items, adjust totals when OCR gets something wrong, and save a clean
-            expense history.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <LoginButton label="Continue with Google" />
-            <a
-              className="flex h-11 items-center justify-center rounded-[8px] border border-border px-5 text-sm font-semibold text-text-primary transition hover:border-primary hover:text-primary"
-              href="#how-it-works"
-            >
-              See how it works
-            </a>
-          </div>
-
-          {error ? (
-            <div className="mt-6 rounded-[8px] border border-red-400/30 bg-red-950/30 p-4 text-sm leading-6 text-red-200">
-              {error}
-            </div>
-          ) : null}
+    <main className="app-gradient min-h-screen text-text-primary">
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-32 top-0 size-96 rounded-full bg-primary/8 blur-3xl" />
+          <div className="absolute -right-32 bottom-0 size-80 rounded-full bg-primary/5 blur-3xl" />
         </div>
 
-        <div className="rounded-[8px] border border-border bg-surface p-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)]">
-          <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
-            <div>
-              <p className="text-sm text-text-secondary">Extracted receipt</p>
-              <h2 className="mt-1 text-xl font-semibold">Keells Super</h2>
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-6 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-24">
+          <div className="animate-fade-up">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-[var(--radius-md)] bg-primary text-sm font-bold text-text-button shadow-glow">
+                RF
+              </div>
+              <Badge variant="primary">
+                <Sparkles className="mr-1 size-3" />
+                RupeeFlow
+              </Badge>
             </div>
-            <div className="rounded-[8px] bg-primary-soft px-3 py-1.5 text-sm font-medium text-primary">
-              Reviewed
+
+            <h1 className="mt-8 max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.25rem]">
+              Turn receipts into trusted expense records
+            </h1>
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-text-secondary">
+              Upload receipts, review extracted line items, adjust totals when OCR
+              gets something wrong, and save a clean expense history — all in one
+              place.
+            </p>
+
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+              <LoginButton label="Continue with Google" />
+              <a
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-border px-5 text-sm font-medium text-text-primary transition hover:border-primary/40 hover:bg-primary-soft/20"
+                href="#how-it-works"
+              >
+                See how it works
+                <ArrowRight className="size-3.5" />
+              </a>
             </div>
+
+            {error ? (
+              <Alert className="mt-8" variant="error">
+                {error}
+              </Alert>
+            ) : null}
           </div>
 
-          <div className="mt-4 overflow-hidden rounded-[8px] border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary">
-                  <th className="px-4 py-3 text-left font-medium text-text-secondary">
-                    Item
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-text-secondary">
-                    Qty
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-text-secondary">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {previewItems.map((item) => (
-                  <tr className="border-b border-border" key={item.item}>
-                    <td className="px-4 py-3">{item.item}</td>
-                    <td className="px-4 py-3">{item.quantity}</td>
-                    <td className="px-4 py-3">{item.amount}</td>
+          {/* Preview card */}
+          <Card
+            className="animate-fade-up stagger-2 shadow-xl"
+            padding="none"
+            variant="elevated"
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-5">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                  Extracted receipt
+                </p>
+                <h2 className="mt-1 text-lg font-semibold tracking-tight">
+                  Keells Super
+                </h2>
+              </div>
+              <Badge variant="success">
+                <CheckCircle2 className="mr-1 size-3" />
+                Reviewed
+              </Badge>
+            </div>
+
+            <div className="mx-6 mt-5 overflow-hidden rounded-[var(--radius-md)] border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface-muted/50">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                      Item
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                      Qty
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                      Amount
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {previewItems.map((item) => (
+                    <tr key={item.item}>
+                      <td className="px-4 py-3 text-text-primary">{item.item}</td>
+                      <td className="px-4 py-3 text-text-secondary">
+                        {item.quantity}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium tabular-nums">
+                        {item.amount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <SummaryTile label="Subtotal" value="5,780" />
-            <SummaryTile label="Discount" value="250" />
-            <SummaryTile label="Tax" value="0" />
-            <SummaryTile label="Total" value="5,530" strong />
-          </div>
+            <div className="grid gap-3 p-6 sm:grid-cols-2">
+              <SummaryTile label="Subtotal" value="5,780" />
+              <SummaryTile label="Discount" value="250" />
+              <SummaryTile label="Tax" value="0" />
+              <SummaryTile highlight label="Total" value="5,530" />
+            </div>
+          </Card>
         </div>
       </section>
 
+      {/* How it works */}
       <section
-        className="border-y border-border bg-surface px-6 py-10"
+        className="border-y border-border/60 bg-surface/40 px-6 py-16 backdrop-blur-sm"
         id="how-it-works"
       >
         <div className="mx-auto max-w-7xl">
-          <div className="max-w-2xl">
-            <p className="text-sm font-medium text-primary">How it works</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-normal">
-              From receipt upload to clean Firestore data.
+          <div className="max-w-xl">
+            <p className="text-xs font-medium uppercase tracking-wider text-primary">
+              How it works
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+              From receipt upload to clean expense data
             </h2>
           </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {[
-              ["1", "Upload one receipt", "Send one PDF or image for extraction."],
-              [
-                "2",
-                "Review extracted fields",
-                "Edit store name, items, discount, tax, and total before saving.",
-              ],
-              [
-                "3",
-                "Save expense history",
-                "Store reviewed receipt details and view them later from the expenses table.",
-              ],
-            ].map(([step, title, description]) => (
-              <article
-                className="rounded-[8px] border border-border bg-background p-5"
-                key={step}
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {steps.map((step, index) => (
+              <Card
+                className={`animate-fade-up stagger-${index + 1} relative overflow-hidden`}
+                hover
+                key={step.step}
               >
-                <div className="grid size-9 place-items-center rounded-[8px] bg-primary text-sm font-bold text-text-button">
-                  {step}
-                </div>
-                <h3 className="mt-4 font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-text-secondary">
-                  {description}
+                <span className="text-4xl font-bold text-primary/20">
+                  {step.step}
+                </span>
+                <h3 className="mt-4 font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                  {step.description}
                 </p>
-              </article>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-12">
-        <div className="grid gap-4 md:grid-cols-3">
-          {features.map((feature) => (
-            <article
-              className="rounded-[8px] border border-border bg-surface p-5"
-              key={feature.title}
-            >
-              <h3 className="font-semibold">{feature.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-text-secondary">
-                {feature.description}
-              </p>
-            </article>
-          ))}
+      {/* Features */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="grid gap-6 md:grid-cols-3">
+          {features.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <Card hover key={feature.title}>
+                <div className="flex size-10 items-center justify-center rounded-[var(--radius-md)] bg-primary-soft text-primary">
+                  <Icon className="size-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="mt-4 font-semibold">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                  {feature.description}
+                </p>
+              </Card>
+            );
+          })}
         </div>
       </section>
 
-      <section className="px-6 pb-12">
-        <div className="mx-auto max-w-7xl rounded-[8px] border border-border bg-surface p-6 sm:flex sm:items-center sm:justify-between sm:gap-8">
-          <div>
-            <p className="text-sm font-medium text-primary">Ready to continue?</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-normal">
-              Log in to manage your RupeeFlow workspace.
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-text-secondary">
-              Use your Google account to access the dashboard, receipts, and
-              expense history.
-            </p>
-          </div>
-          <div className="mt-5 sm:mt-0">
+      {/* CTA */}
+      <section className="px-6 pb-16">
+        <Card
+          className="relative mx-auto max-w-7xl overflow-hidden"
+          padding="lg"
+          variant="elevated"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary-soft/20 to-transparent" />
+          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-primary">
+                Ready to continue?
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                Log in to manage your RupeeFlow workspace
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                Use your Google account to access the dashboard, receipts, and
+                expense history.
+              </p>
+            </div>
             <LoginButton label="Log in with Google" />
           </div>
-        </div>
+        </Card>
       </section>
     </main>
   );
 }
 
-function LoginButton({
-  compact = false,
-  label,
-}: {
-  compact?: boolean;
-  label: string;
-}) {
+function LoginButton({ label }: { label: string }) {
   return (
     <form action="/auth/google" method="GET">
-      <button
-        className={`flex items-center justify-center gap-3 rounded-[8px] bg-primary-dark text-sm font-semibold text-text-button transition focus:outline-none focus:ring-4 focus:ring-primary/25 ${
-          compact ? "h-10 px-4" : "h-11 px-5"
-        }`}
+      <Button
+        className="w-full sm:w-auto"
+        leftIcon={
+          <Image alt="Google logo" height={18} src="/google.svg" width={18} />
+        }
+        size="lg"
         type="submit"
       >
-          <Image src="/google.svg" alt="Google logo" width={24} height={24} />
         {label}
-      </button>
+      </Button>
     </form>
   );
 }
 
 function SummaryTile({
   label,
-  strong = false,
+  highlight = false,
   value,
 }: {
   label: string;
-  strong?: boolean;
+  highlight?: boolean;
   value: string;
 }) {
   return (
-    <div className="rounded-[8px] border border-border bg-secondary px-3 py-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+    <div
+      className={`rounded-[var(--radius-md)] border px-4 py-3 ${
+        highlight
+          ? "border-primary/30 bg-primary-soft/30"
+          : "border-border bg-surface-muted/30"
+      }`}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
         {label}
       </p>
       <p
-        className={`mt-1 text-sm ${
-          strong ? "font-semibold text-primary" : "text-text-primary"
+        className={`mt-1 text-sm tabular-nums ${
+          highlight ? "font-semibold text-primary" : "text-text-primary"
         }`}
       >
         {value}
