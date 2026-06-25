@@ -95,6 +95,7 @@ class SaveReceiptRequest(BaseModel):
     storeName: str
     items: list[ReceiptItem]
     totals: ReceiptTotals
+    created_at: str | None = None
 
 
 FAKE_EXTRACTED_RECEIPT = {
@@ -177,7 +178,7 @@ async def save_receipt(
         "userEmail": receipt.userEmail,
         "items": receipt_items,
         "totals": receipt_totals,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": receipt.created_at or datetime.utcnow().isoformat(),
         "store_name": receipt.storeName,
         "type": "Receipt",
         "total_amount": receipt_totals["total"],

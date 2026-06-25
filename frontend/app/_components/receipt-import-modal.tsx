@@ -342,11 +342,13 @@ export default function ReceiptImportModal() {
               finalTotal={form.finalTotal}
               items={form.items}
               onAddItem={form.addItem}
+              onReceiptDateChange={form.setReceiptDate}
               onRemoveItem={form.removeItem}
               onRowBlur={form.handleRowBlur}
               onStoreNameChange={form.setStoreName}
               onUpdateItem={form.updateItem}
               onUpdateTotal={form.updateTotal}
+              receiptDate={form.receiptDate}
               showErrors={form.showErrors}
               storeName={form.storeName}
               subtotal={form.subtotal}
