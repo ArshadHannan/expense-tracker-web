@@ -6,6 +6,7 @@ import {
   editableTotalFields,
   formatAmountInput,
   formatTotalLabel,
+  getTodayPickerDate,
   type ReceiptItem,
   type ReceiptTotals,
 } from "../_lib/receipt-form-utils";
@@ -16,6 +17,8 @@ import { Input } from "./ui/input";
 type ReceiptDetailsFormProps = {
   storeName: string;
   onStoreNameChange: (value: string) => void;
+  receiptDate: string;
+  onReceiptDateChange: (value: string) => void;
   items: ReceiptItem[];
   onUpdateItem: (
     index: number,
@@ -60,6 +63,8 @@ function OptionalLabel({ children }: { children: React.ReactNode }) {
 export default function ReceiptDetailsForm({
   storeName,
   onStoreNameChange,
+  receiptDate,
+  onReceiptDateChange,
   items,
   onUpdateItem,
   onAddItem,
@@ -74,15 +79,28 @@ export default function ReceiptDetailsForm({
 }: ReceiptDetailsFormProps) {
   return (
     <div className="space-y-4">
-      <Input
-        error={showErrors ? errors?.storeName : undefined}
-        label="Store name"
-        maxLength={100}
-        onChange={(event) => onStoreNameChange(event.target.value)}
-        placeholder="e.g. Keells Super"
-        required
-        value={storeName}
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input
+          error={showErrors ? errors?.storeName : undefined}
+          label="Store name"
+          maxLength={100}
+          onChange={(event) => onStoreNameChange(event.target.value)}
+          placeholder="e.g. Keells Super"
+          required
+          value={storeName}
+        />
+
+        <Input
+          className="[color-scheme:dark]"
+          error={showErrors ? errors?.receiptDate : undefined}
+          label="Expense date"
+          max={getTodayPickerDate()}
+          onChange={(event) => onReceiptDateChange(event.target.value)}
+          required
+          type="date"
+          value={receiptDate}
+        />
+      </div>
 
       {showErrors && errors?.form ? (
         <p className="text-sm text-destructive" role="alert">

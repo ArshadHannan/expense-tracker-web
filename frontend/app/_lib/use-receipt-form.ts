@@ -7,6 +7,8 @@ import {
   computeFinalTotal,
   computeSubtotal,
   formatAmountInput,
+  getTodayPickerDate,
+  pickerDateToCreatedAt,
   type ReceiptItem,
   type ReceiptTotals,
 } from "./receipt-form-utils";
@@ -22,8 +24,12 @@ export function useReceiptForm(initial?: {
   storeName?: string;
   items?: ReceiptItem[];
   totals?: ReceiptTotals;
+  receiptDate?: string;
 }) {
   const [storeName, setStoreNameState] = useState(initial?.storeName ?? "");
+  const [receiptDate, setReceiptDateState] = useState(
+    initial?.receiptDate ?? getTodayPickerDate(),
+  );
   const [items, setItems] = useState<ReceiptItem[]>(
     initial?.items ?? [emptyReceiptItem()],
   );
@@ -41,10 +47,14 @@ export function useReceiptForm(initial?: {
   );
 
   const clearFieldError = useCallback(
-    (scope: "storeName" | "form" | "items" | "totals", key?: string | number) => {
+    (scope: "storeName" | "receiptDate" | "form" | "items" | "totals", key?: string | number) => {
       setErrors((current) => {
         if (scope === "storeName") {
           const { storeName: _, ...rest } = current;
+          return rest;
+        }
+        if (scope === "receiptDate") {
+          const { receiptDate: _, ...rest } = current;
           return rest;
         }
         if (scope === "form") {
@@ -77,6 +87,15 @@ export function useReceiptForm(initial?: {
     (value: string) => {
       setStoreNameState(value);
       clearFieldError("storeName");
+      clearFieldError("form");
+    },
+    [clearFieldError],
+  );
+
+  const setReceiptDate = useCallback(
+    (value: string) => {
+      setReceiptDateState(value);
+      clearFieldError("receiptDate");
       clearFieldError("form");
     },
     [clearFieldError],
@@ -146,14 +165,14 @@ export function useReceiptForm(initial?: {
   }, []);
 
   const validate = useCallback(() => {
-    const result = validateReceiptForm(storeName, items, totals);
+    const result = validateReceiptForm(storeName, items, totals, receiptDate);
     setErrors(result.errors);
     setShowErrors(true);
     return result;
-  }, [storeName, items, totals]);
+  }, [storeName, items, totals, receiptDate]);
 
   const getSavePayload = useCallback(() => {
-    const result = validateReceiptForm(storeName, items, totals);
+    const result = validateReceiptForm(storeName, items, totals, receiptDate);
     setErrors(result.errors);
     setShowErrors(true);
 
@@ -162,6 +181,7 @@ export function useReceiptForm(initial?: {
       errors: result.errors,
       payload: {
         storeName: storeName.trim(),
+        created_at: pickerDateToCreatedAt(receiptDate),
         items: result.cleanedItems.map((item) => ({
           ...item,
           item: item.item.trim(),
@@ -177,10 +197,11 @@ export function useReceiptForm(initial?: {
         },
       },
     };
-  }, [storeName, items, totals]);
+  }, [storeName, items, totals, receiptDate]);
 
   const reset = useCallback(() => {
     setStoreNameState("");
+    setReceiptDateState(getTodayPickerDate());
     setItems([emptyReceiptItem()]);
     setTotals(emptyReceiptTotals());
     setErrors({});
@@ -192,8 +213,10 @@ export function useReceiptForm(initial?: {
       storeName: string;
       items: ReceiptItem[];
       totals: ReceiptTotals;
+      receiptDate?: string;
     }) => {
       setStoreNameState(data.storeName);
+      setReceiptDateState(data.receiptDate ?? getTodayPickerDate());
       setItems(data.items.length > 0 ? data.items : [emptyReceiptItem()]);
       setTotals(data.totals);
       setErrors({});
@@ -205,6 +228,8 @@ export function useReceiptForm(initial?: {
   return {
     storeName,
     setStoreName,
+    receiptDate,
+    setReceiptDate,
     items,
     totals,
     subtotal,

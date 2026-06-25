@@ -3,7 +3,10 @@ import {
   computeSubtotal,
   editableTotalFields,
   emptyReceiptItem,
+  getTodayPickerDate,
+  isValidPickerDate,
   parseAmountInput,
+  pickerDateToCreatedAt,
   type ReceiptItem,
   type ReceiptTotals,
 } from "./receipt-form-utils";
@@ -12,6 +15,7 @@ export type LineItemFieldErrors = Partial<Record<keyof ReceiptItem, string>>;
 
 export type ReceiptFormFieldErrors = {
   storeName?: string;
+  receiptDate?: string;
   items?: Record<number, LineItemFieldErrors>;
   totals?: Partial<Record<(typeof editableTotalFields)[number], string>>;
   form?: string;
@@ -106,6 +110,7 @@ export function validateReceiptForm(
   storeName: string,
   items: ReceiptItem[],
   totals: ReceiptTotals,
+  receiptDate: string,
 ): {
   isValid: boolean;
   errors: ReceiptFormFieldErrors;
@@ -120,6 +125,14 @@ export function validateReceiptForm(
     errors.storeName = `Store name must be at least ${STORE_NAME_MIN} characters.`;
   } else if (trimmedStore.length > STORE_NAME_MAX) {
     errors.storeName = `Store name must be ${STORE_NAME_MAX} characters or fewer.`;
+  }
+
+  if (!receiptDate.trim()) {
+    errors.receiptDate = "Expense date is required.";
+  } else if (!isValidPickerDate(receiptDate)) {
+    errors.receiptDate = "Enter a valid date.";
+  } else if (receiptDate > getTodayPickerDate()) {
+    errors.receiptDate = "Expense date cannot be in the future.";
   }
 
   const nonEmptyItems = filterEmptyLineItems(items);
@@ -165,6 +178,7 @@ export function validateReceiptForm(
 
   const isValid =
     !errors.storeName &&
+    !errors.receiptDate &&
     !errors.form &&
     !errors.items &&
     !errors.totals;
