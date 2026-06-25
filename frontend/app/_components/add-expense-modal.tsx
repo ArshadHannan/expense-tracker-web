@@ -1,20 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useAddExpense } from "../_lib/add-expense-context";
-import {
-  computeFinalTotal,
-  computeSubtotal,
-  emptyReceiptItem,
-  emptyReceiptTotals,
-  formatAmountInput,
-  parseAmountInput,
-  saveReceipt,
-  type ReceiptItem,
-  type ReceiptTotals,
-} from "../_lib/receipt-form-utils";
+import { saveReceipt } from "../_lib/receipt-form-utils";
 import { useReceiptsRefresh } from "../_lib/receipts-refresh-context";
+import { useReceiptForm } from "../_lib/use-receipt-form";
 import ReceiptDetailsForm from "./receipt-details-form";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
@@ -25,75 +16,20 @@ export default function AddExpenseModal() {
   const { refreshReceipts } = useReceiptsRefresh();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
-  const [storeName, setStoreName] = useState("");
-  const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem()]);
-  const [totals, setTotals] = useState<ReceiptTotals>(emptyReceiptTotals());
 
-  const subtotal = useMemo(() => computeSubtotal(items), [items]);
-  const finalTotal = useMemo(
-    () => computeFinalTotal(subtotal, totals),
-    [subtotal, totals],
-  );
-
-  function resetForm() {
-    setStoreName("");
-    setItems([emptyReceiptItem()]);
-    setTotals(emptyReceiptTotals());
-    setError("");
-  }
+  const form = useReceiptForm();
 
   function closeModal() {
-    resetForm();
+    form.reset();
+    setError("");
     close();
   }
 
-  function updateItem(
-    index: number,
-    field: keyof ReceiptItem,
-    value: string,
-  ) {
-    setItems((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item,
-      ),
-    );
-  }
-
-  function addItem() {
-    setItems((current) => [...current, emptyReceiptItem()]);
-  }
-
-  function removeItem(index: number) {
-    setItems((current) =>
-      current.length === 1 ? current : current.filter((_, i) => i !== index),
-    );
-  }
-
-  function updateTotal(field: keyof ReceiptTotals, value: string) {
-    setTotals((current) => ({ ...current, [field]: value }));
-  }
-
-  function validateForm() {
-    if (!storeName.trim()) {
-      return "Store name is required.";
-    }
-
-    const hasLineItem = items.some(
-      (item) => item.item.trim() || parseAmountInput(item.amount) > 0,
-    );
-
-    if (!hasLineItem) {
-      return "Add at least one line item with a name or amount.";
-    }
-
-    return null;
-  }
-
   async function handleSave() {
-    const validationError = validateForm();
+    const { isValid, errors, payload } = form.getSavePayload();
 
-    if (validationError) {
-      setError(validationError);
+    if (!isValid) {
+      setError(errors.form ?? "Fix the highlighted fields before saving.");
       return;
     }
 
@@ -101,18 +37,7 @@ export default function AddExpenseModal() {
     setError("");
 
     try {
-      await saveReceipt({
-        storeName: storeName.trim(),
-        items: items.filter(
-          (item) => item.item.trim() || parseAmountInput(item.amount) > 0,
-        ),
-        totals: {
-          ...totals,
-          subtotal: formatAmountInput(subtotal),
-          total: formatAmountInput(finalTotal),
-        },
-      });
-
+      await saveReceipt(payload);
       toast.success("Expense saved");
       refreshReceipts();
       closeModal();
@@ -148,16 +73,19 @@ export default function AddExpenseModal() {
         {error ? <Alert variant="error">{error}</Alert> : null}
 
         <ReceiptDetailsForm
-          finalTotal={finalTotal}
-          items={items}
-          onAddItem={addItem}
-          onRemoveItem={removeItem}
-          onStoreNameChange={setStoreName}
-          onUpdateItem={updateItem}
-          onUpdateTotal={updateTotal}
-          storeName={storeName}
-          subtotal={subtotal}
-          totals={totals}
+          errors={form.errors}
+          finalTotal={form.finalTotal}
+          items={form.items}
+          onAddItem={form.addItem}
+          onRemoveItem={form.removeItem}
+          onRowBlur={form.handleRowBlur}
+          onStoreNameChange={form.setStoreName}
+          onUpdateItem={form.updateItem}
+          onUpdateTotal={form.updateTotal}
+          showErrors={form.showErrors}
+          storeName={form.storeName}
+          subtotal={form.subtotal}
+          totals={form.totals}
         />
       </div>
     </Modal>
