@@ -77,6 +77,25 @@ function getBackendAuthHeaders(
   return headers;
 }
 
+function getBackendErrorMessage(errorData: unknown, fallback: string) {
+  if (!errorData || typeof errorData !== "object") {
+    return fallback;
+  }
+
+  const data = errorData as { error?: string; detail?: string };
+  return data.error ?? data.detail ?? fallback;
+}
+
+function getMissingBackendSecretResponse() {
+  return NextResponse.json(
+    {
+      error:
+        "Missing BACKEND_API_SECRET. Add the same secret to frontend and backend env on Vercel, then redeploy.",
+    },
+    { status: 503 },
+  );
+}
+
 export async function GET() {
   const user = await getCurrentUser();
 
@@ -109,7 +128,12 @@ export async function GET() {
       const errorData = await backendResponse.json().catch(() => null);
 
       return NextResponse.json(
-        { error: errorData?.error || "Failed to fetch receipts from backend" },
+        {
+          error: getBackendErrorMessage(
+            errorData,
+            "Failed to fetch receipts from backend",
+          ),
+        },
         { status: backendResponse.status },
       );
     }

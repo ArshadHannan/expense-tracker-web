@@ -1,8 +1,18 @@
+import { CheckSquare } from "lucide-react";
+import { ComingSoon } from "../../../_components/ui/coming-soon";
+
 export default async function ApprovalsPage() {
   return (
-    <div className="rounded-[8px] border border-border bg-surface p-8 text-text-secondary">
-      <p className="text-lg font-semibold text-text-primary">Approvals</p>
-      <p className="mt-3">This section is coming soon.</p>
-    </div>
+    <ComingSoon
+      description="Review pending expense submissions, approve or reject with comments, and maintain a clear audit trail for your team."
+      features={[
+        "Pending expense queue",
+        "One-click approve or reject",
+        "Comment and feedback on submissions",
+        "Full approval history and audit log",
+      ]}
+      icon={CheckSquare}
+      title="Approval workflow"
+    />
   );
 }
