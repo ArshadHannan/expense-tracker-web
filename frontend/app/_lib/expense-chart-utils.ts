@@ -62,7 +62,10 @@ export function buildMonthlyExpenseChart(
 
     points.push({
       day,
-      label: `${monthLabel} ${String(day).padStart(2, "0")}`,
+      label:
+        day === 1 || day === daysInMonth
+          ? `${monthLabel} ${day}`
+          : `${monthLabel} ${String(day).padStart(2, "0")}`,
       budgetPace,
       cumulativeSpent: day <= today ? runningTotal : null,
     });
@@ -87,7 +90,12 @@ export function getPredictedEndOfMonthSpend(
   return Math.round((spentSoFar / today) * daysInMonth);
 }
 
-export function shouldShowChartXTickLabel(index: number, total: number) {
+export function shouldShowChartXTickLabel(
+  index: number,
+  total: number,
+  day: number,
+  today: number,
+) {
   if (total <= 1) {
     return true;
   }
@@ -96,5 +104,22 @@ export function shouldShowChartXTickLabel(index: number, total: number) {
     return true;
   }
 
+  if (day > today) {
+    return true;
+  }
+
   return index % 5 === 0;
+}
+
+export function getChartXAxisTickDays(
+  chartPoints: ExpenseChartPoint[],
+  referenceDate = new Date(),
+) {
+  const today = referenceDate.getDate();
+
+  return chartPoints
+    .filter((point, index) =>
+      shouldShowChartXTickLabel(index, chartPoints.length, point.day, today),
+    )
+    .map((point) => point.day);
 }

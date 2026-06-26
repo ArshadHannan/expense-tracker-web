@@ -5,8 +5,8 @@ import { Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
 import { useMemo } from "react";
 import {
   buildMonthlyExpenseChart,
+  getChartXAxisTickDays,
   getPredictedEndOfMonthSpend,
-  shouldShowChartXTickLabel,
 } from "../../../_lib/expense-chart-utils";
 import { useAccount } from "../../../_lib/use-account";
 import { useReceipts } from "../../../_lib/use-receipts";
@@ -60,6 +60,11 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
   const chartPoints = useMemo(
     () => buildMonthlyExpenseChart(receipts, monthlyBudgetLimit),
     [monthlyBudgetLimit, receipts],
+  );
+
+  const chartXAxisTickDays = useMemo(
+    () => getChartXAxisTickDays(chartPoints),
+    [chartPoints],
   );
 
   const predictedEndOfMonth = useMemo(
@@ -210,7 +215,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                 <span className="inline-flex items-center gap-2">
                   <span
                     aria-hidden
-                    className="inline-block h-0 w-6 border-t-2 border-dashed border-[#8a9389]"
+                    className="inline-block h-0 w-6 border-t-2 border-dashed border-[#c65d12]"
                   />
                   Budget pace
                 </span>
@@ -224,12 +229,12 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
               </div>
             </div>
           </CardHeader>
-          <div className="relative h-[280px] overflow-visible">
+          <div className="relative h-[300px] w-full overflow-visible">
             <LineChart
-              colors={["#8a9389", "#59b655"]}
+              colors={["#c65d12", "#59b655"]}
               grid={{ horizontal: true, vertical: false }}
               hideLegend
-              margin={{ bottom: 8, left: 8, right: 8, top: 16 }}
+              margin={{ bottom: 4, left: 4, right: 20, top: 12 }}
               series={[
                 {
                   curve: "linear",
@@ -255,7 +260,10 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
               sx={{
                 "& .MuiAreaElement-series-spent": {
                   fill: "url(#spent-gradient)",
-                  fillOpacity: 0.15,
+                  fillOpacity: 1,
+                },
+                "& .MuiChartsAxis-bottom .MuiChartsAxis-tickLabel": {
+                  fontSize: "10px",
                 },
                 "& .MuiChartsAxis-line": { stroke: "var(--border)" },
                 "& .MuiChartsAxis-tick": { stroke: "var(--border)" },
@@ -272,13 +280,16 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                 "& .MuiChartsGrid-line": {
                   stroke: "var(--border)",
                   strokeDasharray: "3 6",
-                  strokeOpacity: 0.5,
-                },
-                "& .MuiLineElement-root": {
-                  strokeWidth: 2,
+                  strokeOpacity: 0.35,
                 },
                 "& .MuiLineElement-series-budgetPace": {
-                  strokeDasharray: "6 4",
+                  stroke: "#c65d12 !important",
+                  strokeDasharray: "8 6 !important",
+                  strokeWidth: 2.5,
+                },
+                "& .MuiLineElement-series-spent": {
+                  stroke: "#59b655 !important",
+                  strokeWidth: 2.5,
                 },
               }}
               xAxis={[
@@ -286,8 +297,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                   data: chartPoints.map((point) => point.day),
                   height: "auto",
                   scaleType: "point",
-                  tickLabelInterval: (_value, index) =>
-                    shouldShowChartXTickLabel(index, chartPoints.length),
+                  tickInterval: chartXAxisTickDays,
                   tickLabelStyle: { fill: "var(--text-tertiary)" },
                   valueFormatter: (day) => {
                     const point = chartPoints.find((chartPoint) => chartPoint.day === day);
@@ -307,7 +317,8 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
             <svg aria-hidden className="absolute size-0">
               <defs>
                 <linearGradient id="spent-gradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#59b655" stopOpacity={0.35} />
+                  <stop offset="0%" stopColor="#59b655" stopOpacity={0.14} />
+                  <stop offset="85%" stopColor="#59b655" stopOpacity={0.04} />
                   <stop offset="100%" stopColor="#59b655" stopOpacity={0} />
                 </linearGradient>
               </defs>
