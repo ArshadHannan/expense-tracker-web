@@ -124,79 +124,99 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
       </div>
 
       {/* Budget utilization + Latest receipt */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card padding="md">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-text-secondary">
-                Budget utilization
-              </p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
-                {budgetUsedPercent}%
-              </p>
-            </div>
-            <Badge variant={budgetUsedPercent > 80 ? "warning" : "primary"}>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="border-l-2 border-l-primary/50" padding="sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
+              Budget utilization
+            </p>
+            <Badge
+              className="shrink-0"
+              variant={budgetUsedPercent > 80 ? "warning" : "primary"}
+            >
               {budgetUsedPercent > 80 ? "Near limit" : "On track"}
             </Badge>
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-muted">
+
+          <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-text-primary">
+            {budgetUsedPercent}%
+          </p>
+
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-muted">
             <div
               className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${budgetUsedPercent}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-text-tertiary">
-            {formatAmount(monthlySpent)} spent of {formatAmount(monthlyBudgetLimit)} budget
-          </p>
+
+          <div className="mt-2.5 flex items-center justify-between gap-3 text-xs text-text-tertiary">
+            <span className="tabular-nums">
+              {formatAmount(monthlySpent)} spent
+            </span>
+            <span className="tabular-nums">
+              of {formatAmount(monthlyBudgetLimit)}
+            </span>
+          </div>
         </Card>
 
-        <Card className="flex flex-col" padding="md">
-          <CardHeader>
-            <div>
-              <CardTitle>Latest receipt</CardTitle>
-              <CardDescription>Most recently saved expense</CardDescription>
-            </div>
-            <div className="flex size-9 items-center justify-center rounded-[var(--radius-md)] bg-primary-soft text-primary">
-              <Receipt className="size-4" strokeWidth={1.75} />
-            </div>
-          </CardHeader>
-
-          {summary.latestDate ? (
-            <div className="mt-auto space-y-4">
-              {summary.latestStore ? (
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
-                    Store
-                  </p>
-                  <p className="mt-1 font-medium text-text-primary">
-                    {summary.latestStore}
-                  </p>
-                </div>
-              ) : null}
-              {summary.latestAmount ? (
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
-                    Amount
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold tabular-nums text-primary">
-                    {summary.latestAmount}
-                  </p>
-                </div>
-              ) : null}
-              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <Clock className="size-3.5 shrink-0" />
-                {formatDate(summary.latestDate)}
-              </div>
-              <p className="truncate text-sm text-text-tertiary">
-                {summary.latestPreview}
+        <Card padding="sm">
+          <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold tracking-tight text-text-primary">
+                Latest receipt
+              </h3>
+              <p className="mt-0.5 text-xs text-text-tertiary">
+                Most recently saved expense
               </p>
             </div>
-          ) : (
-            <div className="mt-auto flex flex-col items-center py-8 text-center">
-              <div className="flex size-12 items-center justify-center rounded-[var(--radius-lg)] bg-surface-muted text-text-tertiary">
-                <Receipt className="size-5" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-primary-soft text-primary">
+              <Receipt className="size-3.5" strokeWidth={1.75} />
+            </div>
+          </div>
+
+          {summary.latestDate ? (
+            <div className="pt-3">
+              <div className="grid grid-cols-[1fr_auto] items-end gap-x-4 gap-y-1">
+                {summary.latestStore ? (
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
+                      Store
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-medium text-text-primary">
+                      {summary.latestStore}
+                    </p>
+                  </div>
+                ) : (
+                  <div />
+                )}
+                {summary.latestAmount ? (
+                  <div className="text-right">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
+                      Amount
+                    </p>
+                    <p className="mt-0.5 text-xl font-semibold tabular-nums text-primary">
+                      {summary.latestAmount}
+                    </p>
+                  </div>
+                ) : null}
               </div>
-              <p className="mt-4 text-sm text-text-secondary">
+
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/40 pt-2.5">
+                <div className="flex min-w-0 items-center gap-1.5 text-xs text-text-secondary">
+                  <Clock className="size-3 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate">{formatDate(summary.latestDate)}</span>
+                </div>
+                <p className="max-w-[48%] truncate text-right text-xs text-text-tertiary">
+                  {summary.latestPreview}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 py-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-muted text-text-tertiary">
+                <Receipt className="size-4" strokeWidth={1.75} />
+              </div>
+              <p className="text-sm leading-snug text-text-secondary">
                 Upload a receipt to see your latest expense here.
               </p>
             </div>
