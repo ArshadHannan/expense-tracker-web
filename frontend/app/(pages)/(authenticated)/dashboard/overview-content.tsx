@@ -3,7 +3,12 @@
 import { LineChart } from "@mui/x-charts/LineChart";
 import { Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
 import { useMemo } from "react";
-import expenseTrend from "@/fake-data/expense-trend.json";
+import { useAccount } from "../../../_lib/account-context";
+import {
+  buildMonthlyExpenseTrend,
+  computeMonthlySpent,
+  predictEndOfMonthSpend,
+} from "../../../_lib/expense-utils";
 import { useReceipts } from "../../../_lib/use-receipts";
 import { Alert } from "../../../_components/ui/alert";
 import { Badge } from "../../../_components/ui/badge";
@@ -16,8 +21,33 @@ type OverviewContentProps = {
 };
 
 export default function OverviewContent({ userEmail }: OverviewContentProps) {
-  const { dataSource, error, loading, receipts, totalSpent } =
-    useReceipts(userEmail);
+  const { account } = useAccount();
+  const { dataSource, error, loading, receipts } = useReceipts(userEmail);
+
+  const monthlyBudget = account.monthly_budget ?? 0;
+
+  const monthlySpent = useMemo(
+    () => computeMonthlySpent(receipts),
+    [receipts],
+  );
+
+  const expenseTrend = useMemo(
+    () => buildMonthlyExpenseTrend(receipts),
+    [receipts],
+  );
+
+  const predictedEndOfMonth = useMemo(
+    () => predictEndOfMonthSpend(monthlySpent),
+    [monthlySpent],
+  );
+
+  const budgetUsedPercent = useMemo(() => {
+    if (monthlyBudget <= 0) {
+      return 0;
+    }
+
+    return Math.min(100, Math.round((monthlySpent / monthlyBudget) * 100));
+  }, [monthlyBudget, monthlySpent]);
 
   const summary = useMemo(() => {
     const latestReceipt = receipts
@@ -50,13 +80,6 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
   const formatAmount = (amount: number) =>
     `${amount.toLocaleString("en-US")} Rs`;
 
-  const hardcodedBudget = 50000;
-  const predictedEndOfMonth = 38000;
-  const budgetUsedPercent = Math.min(
-    100,
-    Math.round((totalSpent / hardcodedBudget) * 100),
-  );
-
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -74,15 +97,15 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           hint="Monthly budget limit"
           icon={<Wallet className="size-5" strokeWidth={1.75} />}
           label="Budget amount"
-          value={formatAmount(hardcodedBudget)}
+          value={formatAmount(monthlyBudget)}
         />
         <StatCard
           hint="Estimated total spend by month end"
           icon={<TrendingUp className="size-5" strokeWidth={1.75} />}
           label="Predicted end-of-month"
           trend={{
-            positive: predictedEndOfMonth < hardcodedBudget,
-            value: `${Math.round((predictedEndOfMonth / hardcodedBudget) * 100)}% of budget`,
+            positive: predictedEndOfMonth < monthlyBudget,
+            value: `${monthlyBudget > 0 ? Math.round((predictedEndOfMonth / monthlyBudget) * 100) : 0}% of budget`,
           }}
           value={formatAmount(predictedEndOfMonth)}
         />
@@ -90,7 +113,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           hint={`${budgetUsedPercent}% of budget used · ${dataSource === "fake" ? "demo data" : "live data"}`}
           icon={<IndianRupee className="size-5" strokeWidth={1.75} />}
           label="Total expenses"
-          value={formatAmount(totalSpent)}
+          value={formatAmount(monthlySpent)}
         />
       </div>
 
@@ -116,7 +139,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           />
         </div>
         <p className="mt-2 text-xs text-text-tertiary">
-          {formatAmount(totalSpent)} spent of {formatAmount(hardcodedBudget)} budget
+          {formatAmount(monthlySpent)} spent of {formatAmount(monthlyBudget)} budget
         </p>
       </Card>
 
@@ -126,7 +149,9 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           <CardHeader>
             <div>
               <CardTitle>Expense trend</CardTitle>
-              <CardDescription>Monthly spend by date</CardDescription>
+              <CardDescription>
+                Cumulative spend from the 1st to the last day of this month
+              </CardDescription>
             </div>
           </CardHeader>
           <div className="h-[280px]">
@@ -176,6 +201,14 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                 {
                   data: expenseTrend.map((point) => point.date),
                   scaleType: "point",
+                  tickInterval: (_value, index) => {
+                    const total = expenseTrend.length;
+                    if (total <= 1) {
+                      return true;
+                    }
+
+                    return index === 0 || index === total - 1;
+                  },
                   tickLabelStyle: { fill: "var(--text-tertiary)" },
                 },
               ]}
