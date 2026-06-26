@@ -4,6 +4,7 @@ import { LineChart } from "@mui/x-charts/LineChart";
 import { Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
 import { useMemo } from "react";
 import expenseTrend from "@/fake-data/expense-trend.json";
+import { useAccount } from "../../../_lib/use-account";
 import { useReceipts } from "../../../_lib/use-receipts";
 import { Alert } from "../../../_components/ui/alert";
 import { Badge } from "../../../_components/ui/badge";
@@ -16,6 +17,7 @@ type OverviewContentProps = {
 };
 
 export default function OverviewContent({ userEmail }: OverviewContentProps) {
+  const { loading: accountLoading, monthlyBudget } = useAccount();
   const { dataSource, error, loading, receipts, totalSpent } =
     useReceipts(userEmail);
 
@@ -50,14 +52,14 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
   const formatAmount = (amount: number) =>
     `${amount.toLocaleString("en-US")} Rs`;
 
-  const hardcodedBudget = 50000;
+  const monthlyBudgetLimit = monthlyBudget ?? 0;
   const predictedEndOfMonth = 38000;
-  const budgetUsedPercent = Math.min(
-    100,
-    Math.round((totalSpent / hardcodedBudget) * 100),
-  );
+  const budgetUsedPercent =
+    monthlyBudgetLimit > 0
+      ? Math.min(100, Math.round((totalSpent / monthlyBudgetLimit) * 100))
+      : 0;
 
-  if (loading) {
+  if (loading || accountLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -74,15 +76,18 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           hint="Monthly budget limit"
           icon={<Wallet className="size-5" strokeWidth={1.75} />}
           label="Budget amount"
-          value={formatAmount(hardcodedBudget)}
+          value={formatAmount(monthlyBudgetLimit)}
         />
         <StatCard
           hint="Estimated total spend by month end"
           icon={<TrendingUp className="size-5" strokeWidth={1.75} />}
           label="Predicted end-of-month"
           trend={{
-            positive: predictedEndOfMonth < hardcodedBudget,
-            value: `${Math.round((predictedEndOfMonth / hardcodedBudget) * 100)}% of budget`,
+            positive: predictedEndOfMonth < monthlyBudgetLimit,
+            value:
+              monthlyBudgetLimit > 0
+                ? `${Math.round((predictedEndOfMonth / monthlyBudgetLimit) * 100)}% of budget`
+                : "—",
           }}
           value={formatAmount(predictedEndOfMonth)}
         />
@@ -116,7 +121,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           />
         </div>
         <p className="mt-2 text-xs text-text-tertiary">
-          {formatAmount(totalSpent)} spent of {formatAmount(hardcodedBudget)} budget
+          {formatAmount(totalSpent)} spent of {formatAmount(monthlyBudgetLimit)} budget
         </p>
       </Card>
 
