@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import DashboardShell from "../../_components/dashboard-shell";
+import { AuthenticatedGate } from "../../_components/authenticated-gate";
 
 export default async function AuthenticatedLayout({
   children,
@@ -14,5 +14,5 @@ export default async function AuthenticatedLayout({
     redirect("/login");
   }
 
-  return <DashboardShell user={user}>{children}</DashboardShell>;
+  return <AuthenticatedGate user={user}>{children}</AuthenticatedGate>;
 }
