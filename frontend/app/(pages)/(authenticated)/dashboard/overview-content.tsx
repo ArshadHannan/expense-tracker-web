@@ -3,7 +3,10 @@
 import { LineChart } from "@mui/x-charts/LineChart";
 import { Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
 import { useMemo } from "react";
-import expenseTrend from "@/fake-data/expense-trend.json";
+import {
+  buildMonthlyExpenseChart,
+  getPredictedEndOfMonthSpend,
+} from "../../../_lib/expense-chart-utils";
 import { useAccount } from "../../../_lib/use-account";
 import { useReceipts } from "../../../_lib/use-receipts";
 import { Alert } from "../../../_components/ui/alert";
@@ -18,8 +21,7 @@ type OverviewContentProps = {
 
 export default function OverviewContent({ userEmail }: OverviewContentProps) {
   const { loading: accountLoading, monthlyBudget } = useAccount();
-  const { dataSource, error, loading, receipts, totalSpent } =
-    useReceipts(userEmail);
+  const { dataSource, error, loading, receipts } = useReceipts(userEmail);
 
   const summary = useMemo(() => {
     const latestReceipt = receipts
@@ -53,10 +55,25 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
     `${amount.toLocaleString("en-US")} Rs`;
 
   const monthlyBudgetLimit = monthlyBudget ?? 0;
-  const predictedEndOfMonth = 38000;
+
+  const chartPoints = useMemo(
+    () => buildMonthlyExpenseChart(receipts, monthlyBudgetLimit),
+    [monthlyBudgetLimit, receipts],
+  );
+
+  const predictedEndOfMonth = useMemo(
+    () => getPredictedEndOfMonthSpend(chartPoints),
+    [chartPoints],
+  );
+
+  const monthlySpent = useMemo(() => {
+    const today = new Date().getDate();
+    return chartPoints.find((point) => point.day === today)?.cumulativeSpent ?? 0;
+  }, [chartPoints]);
+
   const budgetUsedPercent =
     monthlyBudgetLimit > 0
-      ? Math.min(100, Math.round((totalSpent / monthlyBudgetLimit) * 100))
+      ? Math.min(100, Math.round((monthlySpent / monthlyBudgetLimit) * 100))
       : 0;
 
   if (loading || accountLoading) {
@@ -92,10 +109,10 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           value={formatAmount(predictedEndOfMonth)}
         />
         <StatCard
-          hint={`${budgetUsedPercent}% of budget used · ${dataSource === "fake" ? "demo data" : "live data"}`}
+          hint={`${budgetUsedPercent}% of budget used this month · ${dataSource === "fake" ? "demo data" : "live data"}`}
           icon={<IndianRupee className="size-5" strokeWidth={1.75} />}
-          label="Total expenses"
-          value={formatAmount(totalSpent)}
+          label="Spent this month"
+          value={formatAmount(monthlySpent)}
         />
       </div>
 
@@ -121,7 +138,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           />
         </div>
         <p className="mt-2 text-xs text-text-tertiary">
-          {formatAmount(totalSpent)} spent of {formatAmount(monthlyBudgetLimit)} budget
+          {formatAmount(monthlySpent)} spent of {formatAmount(monthlyBudgetLimit)} budget
         </p>
       </Card>
 
@@ -131,29 +148,58 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           <CardHeader>
             <div>
               <CardTitle>Expense trend</CardTitle>
-              <CardDescription>Monthly spend by date</CardDescription>
+              <CardDescription>
+                Cumulative spending this month vs budget pace
+              </CardDescription>
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-text-secondary">
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="inline-block h-0 w-6 border-t-2 border-dashed border-[#8a9389]"
+                  />
+                  Budget pace
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="inline-block h-0.5 w-6 rounded-full bg-primary"
+                  />
+                  Spent
+                </span>
+              </div>
             </div>
           </CardHeader>
-          <div className="h-[280px]">
+          <div className="relative h-[280px]">
             <LineChart
-              colors={["#59b655"]}
+              colors={["#8a9389", "#59b655"]}
               grid={{ horizontal: true, vertical: false }}
               hideLegend
               margin={{ bottom: 32, left: 8, right: 16, top: 16 }}
               series={[
                 {
+                  curve: "linear",
+                  data: chartPoints.map((point) => point.budgetPace),
+                  id: "budgetPace",
+                  label: "Budget pace",
+                  showMark: false,
+                  valueFormatter: (value) =>
+                    value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
+                },
+                {
                   area: true,
-                  curve: "natural",
-                  data: expenseTrend.map((point) => point.amount),
-                  label: "Amount",
+                  curve: "linear",
+                  connectNulls: false,
+                  data: chartPoints.map((point) => point.cumulativeSpent),
+                  id: "spent",
+                  label: "Spent",
                   showMark: false,
                   valueFormatter: (value) =>
                     value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
                 },
               ]}
               sx={{
-                "& .MuiAreaElement-root": {
-                  fill: "url(#gradient)",
+                "& .MuiAreaElement-series-spent": {
+                  fill: "url(#spent-gradient)",
                   fillOpacity: 0.15,
                 },
                 "& .MuiChartsAxis-line": { stroke: "var(--border)" },
@@ -176,11 +222,16 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                 "& .MuiLineElement-root": {
                   strokeWidth: 2,
                 },
+                "& .MuiLineElement-series-budgetPace": {
+                  strokeDasharray: "6 4",
+                },
               }}
               xAxis={[
                 {
-                  data: expenseTrend.map((point) => point.date),
+                  data: chartPoints.map((point) => point.label),
                   scaleType: "point",
+                  tickInterval: (_value, index) =>
+                    index % 5 === 0 || index === chartPoints.length - 1,
                   tickLabelStyle: { fill: "var(--text-tertiary)" },
                 },
               ]}
@@ -193,6 +244,14 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                 },
               ]}
             />
+            <svg aria-hidden className="absolute size-0">
+              <defs>
+                <linearGradient id="spent-gradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#59b655" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#59b655" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
         </Card>
 
