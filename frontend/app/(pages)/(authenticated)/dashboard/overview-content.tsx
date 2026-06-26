@@ -1,6 +1,6 @@
 "use client";
 
-import { LineChart } from "@mui/x-charts/LineChart";
+import { LineChart, lineClasses } from "@mui/x-charts/LineChart";
 import { Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
 import { useMemo } from "react";
 import {
@@ -10,6 +10,7 @@ import {
 } from "../../../_lib/expense-chart-utils";
 import { useAccount } from "../../../_lib/use-account";
 import { useReceipts } from "../../../_lib/use-receipts";
+import { ExpenseChartLine } from "../../../_components/expense-chart-line";
 import { Alert } from "../../../_components/ui/alert";
 import { Badge } from "../../../_components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../_components/ui/card";
@@ -235,6 +236,20 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
               grid={{ horizontal: true, vertical: false }}
               hideLegend
               margin={{ bottom: 4, left: 4, right: 20, top: 12 }}
+              slots={{ line: ExpenseChartLine }}
+              slotProps={{
+                line: (ownerState) =>
+                  ownerState.seriesId === "budgetPace"
+                    ? {
+                        stroke: "#c65d12",
+                        strokeDasharray: "8 6",
+                        strokeWidth: 2.5,
+                      }
+                    : {
+                        stroke: "#59b655",
+                        strokeWidth: 2.5,
+                      },
+              }}
               series={[
                 {
                   curve: "linear",
@@ -258,7 +273,7 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                 },
               ]}
               sx={{
-                "& .MuiAreaElement-series-spent": {
+                [`& .${lineClasses.area}[data-series="spent"]`]: {
                   fill: "url(#spent-gradient)",
                   fillOpacity: 1,
                 },
@@ -281,15 +296,6 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
                   stroke: "var(--border)",
                   strokeDasharray: "3 6",
                   strokeOpacity: 0.35,
-                },
-                "& .MuiLineElement-series-budgetPace": {
-                  stroke: "#c65d12 !important",
-                  strokeDasharray: "8 6 !important",
-                  strokeWidth: 2.5,
-                },
-                "& .MuiLineElement-series-spent": {
-                  stroke: "#59b655 !important",
-                  strokeWidth: 2.5,
                 },
               }}
               xAxis={[
