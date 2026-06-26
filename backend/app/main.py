@@ -98,11 +98,6 @@ class SaveReceiptRequest(BaseModel):
     created_at: str | None = None
 
 
-class SaveAccountRequest(BaseModel):
-    userEmail: str
-    monthly_budget: float
-
-
 FAKE_EXTRACTED_RECEIPT = {
     "storeName": "Keells Super",
     "items": [
@@ -216,87 +211,6 @@ def parse_amount(value: str) -> float:
         return float(value.replace(",", "").strip())
     except ValueError:
         return 0
-
-
-@app.get("/account")
-async def get_account(
-    userEmail: str = Query(...),
-    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
-) -> dict:
-    if not db:
-        return JSONResponse(
-            {"error": "Firebase not initialized", "onboarded": False},
-            status_code=500,
-        )
-
-    if not userEmail:
-        return JSONResponse(
-            {"error": "User email required", "onboarded": False},
-            status_code=400,
-        )
-
-    try:
-        user_doc = db.collection("users").document(userEmail).get()
-        if not user_doc.exists:
-            return {"onboarded": False, "monthly_budget": None}
-
-        user_data = user_doc.to_dict() or {}
-        monthly_budget = user_data.get("monthly_budget")
-
-        if monthly_budget is None:
-            return {"onboarded": False, "monthly_budget": None}
-
-        return {"onboarded": True, "monthly_budget": monthly_budget}
-    except Exception as e:
-        print(f"Error fetching account: {e}")
-        return JSONResponse(
-            {"error": str(e), "onboarded": False},
-            status_code=500,
-        )
-
-
-@app.post("/account")
-async def save_account(
-    account: SaveAccountRequest,
-    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
-) -> dict:
-    if not db:
-        return JSONResponse(
-            {"error": "Firebase not initialized", "saved": False},
-            status_code=500,
-        )
-
-    if not account.userEmail:
-        return JSONResponse(
-            {"error": "User email required", "saved": False},
-            status_code=400,
-        )
-
-    if account.monthly_budget <= 0:
-        return JSONResponse(
-            {"error": "Monthly budget must be greater than zero", "saved": False},
-            status_code=400,
-        )
-
-    try:
-        db.collection("users").document(account.userEmail).set(
-            {
-                "monthly_budget": account.monthly_budget,
-                "onboarded_at": datetime.utcnow().isoformat(),
-            },
-            merge=True,
-        )
-        return {
-            "saved": True,
-            "onboarded": True,
-            "monthly_budget": account.monthly_budget,
-        }
-    except Exception as e:
-        print(f"Error saving account: {e}")
-        return JSONResponse(
-            {"error": str(e), "saved": False},
-            status_code=500,
-        )
 
 
 @app.get("/receipts")
