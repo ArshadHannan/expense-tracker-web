@@ -86,3 +86,15 @@ export function getPredictedEndOfMonthSpend(
 
   return Math.round((spentSoFar / today) * daysInMonth);
 }
+
+export function shouldShowChartXTickLabel(index: number, total: number) {
+  if (total <= 1) {
+    return true;
+  }
+
+  if (index === 0 || index === total - 1) {
+    return true;
+  }
+
+  return index % 5 === 0;
+}

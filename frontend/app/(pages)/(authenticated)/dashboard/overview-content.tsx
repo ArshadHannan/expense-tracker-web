@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import {
   buildMonthlyExpenseChart,
   getPredictedEndOfMonthSpend,
+  shouldShowChartXTickLabel,
 } from "../../../_lib/expense-chart-utils";
 import { useAccount } from "../../../_lib/use-account";
 import { useReceipts } from "../../../_lib/use-receipts";
@@ -116,143 +117,31 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
         />
       </div>
 
-      {/* Budget progress */}
-      <Card padding="md">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-text-secondary">
-              Budget utilization
-            </p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
-              {budgetUsedPercent}%
-            </p>
-          </div>
-          <Badge variant={budgetUsedPercent > 80 ? "warning" : "primary"}>
-            {budgetUsedPercent > 80 ? "Near limit" : "On track"}
-          </Badge>
-        </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-500"
-            style={{ width: `${budgetUsedPercent}%` }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-text-tertiary">
-          {formatAmount(monthlySpent)} spent of {formatAmount(monthlyBudgetLimit)} budget
-        </p>
-      </Card>
-
-      {/* Chart + Latest receipt */}
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+      {/* Budget utilization + Latest receipt */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card padding="md">
-          <CardHeader>
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <CardTitle>Expense trend</CardTitle>
-              <CardDescription>
-                Cumulative spending this month vs budget pace
-              </CardDescription>
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-text-secondary">
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="inline-block h-0 w-6 border-t-2 border-dashed border-[#8a9389]"
-                  />
-                  Budget pace
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="inline-block h-0.5 w-6 rounded-full bg-primary"
-                  />
-                  Spent
-                </span>
-              </div>
+              <p className="text-sm font-medium text-text-secondary">
+                Budget utilization
+              </p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                {budgetUsedPercent}%
+              </p>
             </div>
-          </CardHeader>
-          <div className="relative h-[280px]">
-            <LineChart
-              colors={["#8a9389", "#59b655"]}
-              grid={{ horizontal: true, vertical: false }}
-              hideLegend
-              margin={{ bottom: 32, left: 8, right: 16, top: 16 }}
-              series={[
-                {
-                  curve: "linear",
-                  data: chartPoints.map((point) => point.budgetPace),
-                  id: "budgetPace",
-                  label: "Budget pace",
-                  showMark: false,
-                  valueFormatter: (value) =>
-                    value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
-                },
-                {
-                  area: true,
-                  curve: "linear",
-                  connectNulls: false,
-                  data: chartPoints.map((point) => point.cumulativeSpent),
-                  id: "spent",
-                  label: "Spent",
-                  showMark: false,
-                  valueFormatter: (value) =>
-                    value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
-                },
-              ]}
-              sx={{
-                "& .MuiAreaElement-series-spent": {
-                  fill: "url(#spent-gradient)",
-                  fillOpacity: 0.15,
-                },
-                "& .MuiChartsAxis-line": { stroke: "var(--border)" },
-                "& .MuiChartsAxis-tick": { stroke: "var(--border)" },
-                "& .MuiChartsAxis-tickLabel, & .MuiChartsAxis-tickLabel tspan": {
-                  fill: "var(--text-tertiary) !important",
-                  fontFamily: "var(--font-geist-sans)",
-                  fontSize: "11px",
-                },
-                "& .MuiChartsAxis-label, & .MuiChartsAxis-label tspan": {
-                  fill: "var(--text-secondary) !important",
-                  fontFamily: "var(--font-geist-sans)",
-                  fontSize: "12px",
-                },
-                "& .MuiChartsGrid-line": {
-                  stroke: "var(--border)",
-                  strokeDasharray: "3 6",
-                  strokeOpacity: 0.5,
-                },
-                "& .MuiLineElement-root": {
-                  strokeWidth: 2,
-                },
-                "& .MuiLineElement-series-budgetPace": {
-                  strokeDasharray: "6 4",
-                },
-              }}
-              xAxis={[
-                {
-                  data: chartPoints.map((point) => point.label),
-                  scaleType: "point",
-                  tickInterval: (_value, index) =>
-                    index % 5 === 0 || index === chartPoints.length - 1,
-                  tickLabelStyle: { fill: "var(--text-tertiary)" },
-                },
-              ]}
-              yAxis={[
-                {
-                  tickLabelStyle: { fill: "var(--text-tertiary)" },
-                  valueFormatter: (value: number) =>
-                    `${Number(value).toLocaleString("en-US")}`,
-                  width: 56,
-                },
-              ]}
-            />
-            <svg aria-hidden className="absolute size-0">
-              <defs>
-                <linearGradient id="spent-gradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#59b655" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#59b655" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-            </svg>
+            <Badge variant={budgetUsedPercent > 80 ? "warning" : "primary"}>
+              {budgetUsedPercent > 80 ? "Near limit" : "On track"}
+            </Badge>
           </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${budgetUsedPercent}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-text-tertiary">
+            {formatAmount(monthlySpent)} spent of {formatAmount(monthlyBudgetLimit)} budget
+          </p>
         </Card>
 
         <Card className="flex flex-col" padding="md">
@@ -308,6 +197,123 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           )}
         </Card>
       </div>
+
+      {/* Expense trend — full width */}
+      <Card padding="md">
+          <CardHeader>
+            <div>
+              <CardTitle>Expense trend</CardTitle>
+              <CardDescription>
+                Cumulative spending this month vs budget pace
+              </CardDescription>
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-text-secondary">
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="inline-block h-0 w-6 border-t-2 border-dashed border-[#8a9389]"
+                  />
+                  Budget pace
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="inline-block h-0.5 w-6 rounded-full bg-primary"
+                  />
+                  Spent
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <div className="relative h-[280px] overflow-visible">
+            <LineChart
+              colors={["#8a9389", "#59b655"]}
+              grid={{ horizontal: true, vertical: false }}
+              hideLegend
+              margin={{ bottom: 8, left: 8, right: 8, top: 16 }}
+              series={[
+                {
+                  curve: "linear",
+                  data: chartPoints.map((point) => point.budgetPace),
+                  id: "budgetPace",
+                  label: "Budget pace",
+                  showMark: false,
+                  valueFormatter: (value) =>
+                    value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
+                },
+                {
+                  area: true,
+                  curve: "linear",
+                  connectNulls: false,
+                  data: chartPoints.map((point) => point.cumulativeSpent),
+                  id: "spent",
+                  label: "Spent",
+                  showMark: false,
+                  valueFormatter: (value) =>
+                    value === null ? "" : `${value.toLocaleString("en-US")} Rs`,
+                },
+              ]}
+              sx={{
+                "& .MuiAreaElement-series-spent": {
+                  fill: "url(#spent-gradient)",
+                  fillOpacity: 0.15,
+                },
+                "& .MuiChartsAxis-line": { stroke: "var(--border)" },
+                "& .MuiChartsAxis-tick": { stroke: "var(--border)" },
+                "& .MuiChartsAxis-tickLabel, & .MuiChartsAxis-tickLabel tspan": {
+                  fill: "var(--text-tertiary) !important",
+                  fontFamily: "var(--font-geist-sans)",
+                  fontSize: "11px",
+                },
+                "& .MuiChartsAxis-label, & .MuiChartsAxis-label tspan": {
+                  fill: "var(--text-secondary) !important",
+                  fontFamily: "var(--font-geist-sans)",
+                  fontSize: "12px",
+                },
+                "& .MuiChartsGrid-line": {
+                  stroke: "var(--border)",
+                  strokeDasharray: "3 6",
+                  strokeOpacity: 0.5,
+                },
+                "& .MuiLineElement-root": {
+                  strokeWidth: 2,
+                },
+                "& .MuiLineElement-series-budgetPace": {
+                  strokeDasharray: "6 4",
+                },
+              }}
+              xAxis={[
+                {
+                  data: chartPoints.map((point) => point.day),
+                  height: "auto",
+                  scaleType: "point",
+                  tickLabelInterval: (_value, index) =>
+                    shouldShowChartXTickLabel(index, chartPoints.length),
+                  tickLabelStyle: { fill: "var(--text-tertiary)" },
+                  valueFormatter: (day) => {
+                    const point = chartPoints.find((chartPoint) => chartPoint.day === day);
+                    return point?.label ?? String(day);
+                  },
+                },
+              ]}
+              yAxis={[
+                {
+                  tickLabelStyle: { fill: "var(--text-tertiary)" },
+                  valueFormatter: (value: number) =>
+                    `${Number(value).toLocaleString("en-US")}`,
+                  width: 56,
+                },
+              ]}
+            />
+            <svg aria-hidden className="absolute size-0">
+              <defs>
+                <linearGradient id="spent-gradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#59b655" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#59b655" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+      </Card>
     </div>
   );
 }
