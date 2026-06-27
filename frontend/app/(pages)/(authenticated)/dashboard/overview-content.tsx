@@ -1,8 +1,8 @@
 "use client";
 
 import { LineChart, lineClasses } from "@mui/x-charts/LineChart";
-import { Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronDown, Clock, IndianRupee, Receipt, TrendingUp, Wallet } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   buildMonthlyExpenseChart,
   getChartXAxisTickDays,
@@ -21,9 +21,47 @@ type OverviewContentProps = {
   userEmail: string;
 };
 
+function toMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthKeyToLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function OverviewContent({ userEmail }: OverviewContentProps) {
   const { loading: accountLoading, monthlyBudget } = useAccount();
   const { dataSource, error, loading, receipts } = useReceipts(userEmail);
+
+  const currentMonthKey = toMonthKey(new Date());
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>([currentMonthKey]);
+
+    for (const receipt of receipts) {
+      monthSet.add(toMonthKey(new Date(receipt.created_at)));
+    }
+
+    return Array.from(monthSet).sort().reverse();
+  }, [receipts, currentMonthKey]);
+
+  const isCurrentMonth = selectedMonth === currentMonthKey;
+
+  const referenceDate = useMemo(() => {
+    if (isCurrentMonth) return new Date();
+    const [year, month] = selectedMonth.split("-").map(Number);
+    return new Date(year, month, 0); // last day of selected month
+  }, [selectedMonth, isCurrentMonth]);
+
+  const selectedMonthLabel = useMemo(
+    () => monthKeyToLabel(selectedMonth),
+    [selectedMonth],
+  );
 
   const summary = useMemo(() => {
     const latestReceipt = receipts
@@ -59,24 +97,29 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
   const monthlyBudgetLimit = monthlyBudget ?? 0;
 
   const chartPoints = useMemo(
-    () => buildMonthlyExpenseChart(receipts, monthlyBudgetLimit),
-    [monthlyBudgetLimit, receipts],
+    () => buildMonthlyExpenseChart(receipts, monthlyBudgetLimit, referenceDate),
+    [monthlyBudgetLimit, receipts, referenceDate],
   );
 
   const chartXAxisTickDays = useMemo(
-    () => getChartXAxisTickDays(chartPoints),
-    [chartPoints],
+    () => getChartXAxisTickDays(chartPoints, referenceDate),
+    [chartPoints, referenceDate],
   );
 
   const predictedEndOfMonth = useMemo(
-    () => getPredictedEndOfMonthSpend(chartPoints),
-    [chartPoints],
+    () => getPredictedEndOfMonthSpend(chartPoints, referenceDate),
+    [chartPoints, referenceDate],
   );
 
   const monthlySpent = useMemo(() => {
-    const today = new Date().getDate();
+    const today = referenceDate.getDate();
     return chartPoints.find((point) => point.day === today)?.cumulativeSpent ?? 0;
-  }, [chartPoints]);
+  }, [chartPoints, referenceDate]);
+
+  const hasDataForMonth = useMemo(
+    () => chartPoints.some((p) => p.cumulativeSpent !== null && p.cumulativeSpent > 0),
+    [chartPoints],
+  );
 
   const budgetUsedPercent =
     monthlyBudgetLimit > 0
@@ -93,6 +136,25 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
 
   return (
     <div className="space-y-6">
+      {/* Month filter */}
+      <div className="flex items-center justify-end">
+        <div className="relative">
+          <select
+            className="cursor-pointer appearance-none rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            value={selectedMonth}
+          >
+            {availableMonths.map((monthKey) => (
+              <option key={monthKey} value={monthKey}>
+                {monthKeyToLabel(monthKey)}
+                {monthKey === currentMonthKey ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-tertiary" />
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
@@ -103,9 +165,13 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           value={formatAmount(monthlyBudgetLimit)}
         />
         <StatCard
-          hint="Estimated total spend by month end"
+          hint={
+            isCurrentMonth
+              ? "Estimated total spend by month end"
+              : `Full month total for ${selectedMonthLabel}`
+          }
           icon={<TrendingUp className="size-5" strokeWidth={1.75} />}
-          label="Predicted end-of-month"
+          label={isCurrentMonth ? "Predicted end-of-month" : "Month total"}
           trend={{
             positive: predictedEndOfMonth < monthlyBudgetLimit,
             value:
@@ -116,9 +182,9 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
           value={formatAmount(predictedEndOfMonth)}
         />
         <StatCard
-          hint={`${budgetUsedPercent}% of budget used this month · ${dataSource === "fake" ? "demo data" : "live data"}`}
+          hint={`${budgetUsedPercent}% of budget used · ${dataSource === "fake" ? "demo data" : "live data"}`}
           icon={<IndianRupee className="size-5" strokeWidth={1.75} />}
-          label="Spent this month"
+          label={isCurrentMonth ? "Spent this month" : `Spent in ${selectedMonthLabel}`}
           value={formatAmount(monthlySpent)}
         />
       </div>
@@ -226,30 +292,34 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
 
       {/* Expense trend — full width */}
       <Card padding="md">
-          <CardHeader>
-            <div>
-              <CardTitle>Expense trend</CardTitle>
-              <CardDescription>
-                Cumulative spending this month vs budget pace
-              </CardDescription>
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-text-secondary">
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="inline-block h-0 w-6 border-t-2 border-dashed border-[#c65d12]"
-                  />
-                  Budget pace
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="inline-block h-0.5 w-6 rounded-full bg-primary"
-                  />
-                  Spent
-                </span>
-              </div>
+        <CardHeader>
+          <div>
+            <CardTitle>Expense trend</CardTitle>
+            <CardDescription>
+              {isCurrentMonth
+                ? "Cumulative spending this month vs budget pace"
+                : `Cumulative spending in ${selectedMonthLabel} vs budget pace`}
+            </CardDescription>
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-text-secondary">
+              <span className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className="inline-block h-0 w-6 border-t-2 border-dashed border-[#c65d12]"
+                />
+                Budget pace
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className="inline-block h-0.5 w-6 rounded-full bg-primary"
+                />
+                Spent
+              </span>
             </div>
-          </CardHeader>
+          </div>
+        </CardHeader>
+
+        {hasDataForMonth ? (
           <div className="relative h-[300px] w-full overflow-visible">
             <LineChart
               colors={["#c65d12", "#59b655"]}
@@ -350,6 +420,13 @@ export default function OverviewContent({ userEmail }: OverviewContentProps) {
               </defs>
             </svg>
           </div>
+        ) : (
+          <div className="flex h-[300px] items-center justify-center">
+            <p className="text-sm text-text-tertiary">
+              No receipts recorded for {selectedMonthLabel}.
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );
