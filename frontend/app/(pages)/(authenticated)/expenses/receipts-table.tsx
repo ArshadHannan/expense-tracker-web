@@ -1,8 +1,10 @@
 "use client";
 
-import { Eye, Receipt as ReceiptIcon } from "lucide-react";
+import { Eye, Receipt as ReceiptIcon, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { Receipt } from "../../../_lib/use-receipts";
+import { useReceiptsRefresh } from "../../../_lib/receipts-refresh-context";
 import { Button } from "../../../_components/ui/button";
 import { Card } from "../../../_components/ui/card";
 import { EmptyState } from "../../../_components/ui/empty-state";
@@ -18,8 +20,11 @@ export default function ReceiptsTable({
   receipts: Receipt[];
   totalSpent: number;
 }) {
+  const { refreshReceipts } = useReceiptsRefresh();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const totalPages = Math.max(1, Math.ceil(receipts.length / pageSize));
   const visiblePage = Math.min(currentPage, totalPages);
 
@@ -123,15 +128,26 @@ export default function ReceiptsTable({
                       {formatDate(receipt.created_at)}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <Button
-                        aria-label={`View receipt from ${storeName}`}
-                        onClick={() => setSelectedReceipt(receipt)}
-                        size="icon"
-                        title="View receipt"
-                        variant="ghost"
-                      >
-                        <Eye className="size-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          aria-label={`View receipt from ${storeName}`}
+                          onClick={() => setSelectedReceipt(receipt)}
+                          size="icon"
+                          title="View receipt"
+                          variant="ghost"
+                        >
+                          <Eye className="size-4" />
+                        </Button>
+                        <Button
+                          aria-label={`Delete receipt from ${storeName}`}
+                          onClick={() => setReceiptToDelete(receipt)}
+                          size="icon"
+                          title="Delete receipt"
+                          variant="ghost"
+                        >
+                          <Trash2 className="size-4 text-red-500" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -184,6 +200,56 @@ export default function ReceiptsTable({
           onClose={() => setSelectedReceipt(null)}
           receipt={selectedReceipt}
         />
+      ) : null}
+
+      {receiptToDelete ? (
+        <Modal
+          eyebrow="Delete receipt"
+          footer={
+            <>
+              <Button
+                disabled={isDeleting}
+                onClick={() => setReceiptToDelete(null)}
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+              <Button
+                loading={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    const response = await fetch(
+                      `/api/receipts?receiptId=${encodeURIComponent(receiptToDelete.id)}`,
+                      { method: "DELETE" },
+                    );
+                    if (!response.ok) {
+                      const data = await response.json().catch(() => null);
+                      throw new Error(data?.error ?? "Unable to delete receipt.");
+                    }
+                    toast.success("Receipt deleted");
+                    setReceiptToDelete(null);
+                    refreshReceipts();
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Unable to delete receipt.");
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                variant="destructive"
+              >
+                Delete
+              </Button>
+            </>
+          }
+          onClose={() => setReceiptToDelete(null)}
+          open
+          title={`Delete "${receiptToDelete.store_name ?? receiptToDelete.expense_name ?? "receipt"}"`}
+        >
+          <p className="text-sm text-text-secondary">
+            This will permanently remove this receipt and deduct its amount from your total. This cannot be undone.
+          </p>
+        </Modal>
       ) : null}
     </div>
   );

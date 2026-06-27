@@ -237,6 +237,58 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const receiptId = request.nextUrl.searchParams.get("receiptId");
+
+  if (!receiptId) {
+    return NextResponse.json({ error: "Receipt ID required" }, { status: 400 });
+  }
+
+  if (shouldUseFakeData()) {
+    return NextResponse.json({ deleted: true, data_source: "fake" });
+  }
+
+  const backendUrl = getBackendReceiptsUrl();
+
+  if (!backendUrl) {
+    return getMissingBackendUrlResponse();
+  }
+
+  try {
+    const backendResponse = await fetch(
+      `${backendUrl}/${encodeURIComponent(receiptId)}?userEmail=${encodeURIComponent(user.email)}`,
+      {
+        method: "DELETE",
+        headers: getBackendAuthHeaders(),
+      },
+    );
+
+    const data = await backendResponse.json().catch(() => null);
+
+    if (!backendResponse.ok) {
+      return NextResponse.json(
+        { error: data?.error || "Unable to delete receipt." },
+        { status: backendResponse.status },
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Error deleting receipt:", error);
+
+    return NextResponse.json(
+      { error: "Unable to delete receipt." },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getCurrentUser();
