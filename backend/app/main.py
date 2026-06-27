@@ -306,6 +306,59 @@ async def save_account(
         )
 
 
+@app.delete("/receipts/{receipt_id}")
+async def delete_receipt(
+    receipt_id: str,
+    userEmail: str = Query(...),
+    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
+) -> dict:
+    if not db:
+        return JSONResponse(
+            {"error": "Firebase not initialized", "deleted": False},
+            status_code=500,
+        )
+
+    if not userEmail:
+        return JSONResponse(
+            {"error": "User email required", "deleted": False},
+            status_code=400,
+        )
+
+    try:
+        receipt_ref = (
+            db.collection("users")
+            .document(userEmail)
+            .collection("receipts")
+            .document(receipt_id)
+        )
+        receipt_doc = receipt_ref.get()
+
+        if not receipt_doc.exists:
+            return JSONResponse(
+                {"error": "Receipt not found", "deleted": False},
+                status_code=404,
+            )
+
+        receipt_data = receipt_doc.to_dict() or {}
+        total_amount_value = receipt_data.get("total_amount_value", 0)
+
+        receipt_ref.delete()
+
+        if total_amount_value > 0:
+            db.collection("users").document(userEmail).set(
+                {"total_spent": firestore.Increment(-total_amount_value)},
+                merge=True,
+            )
+
+        return {"deleted": True, "receipt_id": receipt_id}
+    except Exception as e:
+        print(f"Error deleting receipt: {e}")
+        return JSONResponse(
+            {"error": "Unable to delete receipt.", "deleted": False},
+            status_code=500,
+        )
+
+
 @app.get("/receipts")
 async def get_receipts(
     userEmail: str = Query(...),
