@@ -52,7 +52,7 @@ export default function AddExpenseModal() {
 
   return (
     <Modal
-      description="Fill in the expense details manually — no receipt upload needed."
+      description="Fill in the expense details manually, no receipt upload needed."
       eyebrow="Manual entry"
       footer={
         <>
