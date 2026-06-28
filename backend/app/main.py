@@ -1,22 +1,26 @@
+import asyncio
+import base64
+import json
 import os
+import re
 import secrets
 from datetime import datetime
 from typing import Annotated
 from dotenv import load_dotenv
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, Query
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Load environment variables
 load_dotenv()
 
 app = FastAPI(title="RupeeFlow Receipt Extractor")
 
 BACKEND_API_SECRET = os.getenv("BACKEND_API_SECRET")
+EXTRACTION_LIMIT = 999
 
 
 def verify_backend_api_secret(
@@ -38,7 +42,6 @@ def verify_backend_api_secret(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-# Configure CORS
 frontend_origins = os.getenv("FRONTEND_ORIGINS")
 if frontend_origins:
     origins = [o.strip() for o in frontend_origins.split(",") if o.strip()]
@@ -52,13 +55,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Firebase
+# Firebase
 try:
     cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "./firebase-credentials.json")
     firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
     if firebase_creds_json:
-        import json
-
         cred_dict = json.loads(firebase_creds_json)
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
@@ -74,6 +75,373 @@ except Exception as e:
     print(f"⚠️  Firebase initialization failed: {e}")
     db = None
 
+# Document AI
+def _is_document_ai_configured() -> bool:
+    return bool(
+        os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+        and os.getenv("DOCUMENT_AI_PROCESSOR_ID")
+    )
+
+def _get_document_ai_client():
+    from google.cloud import documentai
+    from google.oauth2 import service_account
+
+    location = os.getenv("DOCUMENT_AI_LOCATION", "us")
+    api_endpoint = f"{location}-documentai.googleapis.com"
+    client_options = {"api_endpoint": api_endpoint}
+
+    firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if firebase_creds_json:
+        cred_dict = json.loads(firebase_creds_json)
+        creds = service_account.Credentials.from_service_account_info(
+            cred_dict,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        return documentai.DocumentProcessorServiceClient(
+            credentials=creds,
+            client_options=client_options,
+        )
+
+    cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "./firebase-credentials.json")
+    if os.path.exists(cred_path):
+        creds = service_account.Credentials.from_service_account_file(
+            cred_path,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        return documentai.DocumentProcessorServiceClient(
+            credentials=creds,
+            client_options=client_options,
+        )
+
+    return documentai.DocumentProcessorServiceClient(client_options=client_options)
+
+
+def _clean_amount(value: str) -> str:
+    cleaned = re.sub(r"[^\d.]", "", value.replace(",", ""))
+    return cleaned or "0"
+
+
+def _parse_document_ai_receipt(document) -> dict:
+    store_name = ""
+    items = []
+    totals = {
+        "subtotal": "0",
+        "discount": "0",
+        "tax": "0",
+        "serviceCharge": "0",
+        "deliveryFee": "0",
+        "total": "0",
+    }
+
+    for entity in document.entities:
+        t = entity.type_
+        v = entity.mention_text.strip() if entity.mention_text else ""
+
+        if t == "supplier_name":
+            store_name = v
+        elif t == "total_amount":
+            totals["total"] = _clean_amount(v)
+        elif t in ("net_amount", "subtotal"):
+            totals["subtotal"] = _clean_amount(v)
+        elif t == "total_tax_amount":
+            totals["tax"] = _clean_amount(v)
+        elif t == "total_discount_amount":
+            totals["discount"] = _clean_amount(v)
+        elif t == "line_item":
+            item_data = {"item": "", "quantity": "1", "amount": "0"}
+            for prop in entity.properties:
+                pt = prop.type_
+                pv = prop.mention_text.strip() if prop.mention_text else ""
+                if pt == "line_item/description":
+                    item_data["item"] = pv
+                elif pt == "line_item/quantity":
+                    item_data["quantity"] = pv or "1"
+                elif pt == "line_item/amount":
+                    item_data["amount"] = _clean_amount(pv)
+            if item_data["item"]:
+                items.append(item_data)
+
+    return {"storeName": store_name, "items": items, "totals": totals}
+
+
+async def _extract_with_document_ai(file_content: bytes, mime_type: str) -> dict:
+    from google.cloud import documentai
+
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+    location = os.getenv("DOCUMENT_AI_LOCATION", "us")
+    processor_id = os.getenv("DOCUMENT_AI_PROCESSOR_ID")
+
+    client = _get_document_ai_client()
+    processor_name = client.processor_path(project_id, location, processor_id)
+
+    raw_document = documentai.RawDocument(content=file_content, mime_type=mime_type)
+    request = documentai.ProcessRequest(name=processor_name, raw_document=raw_document)
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, client.process_document, request)
+
+    return _parse_document_ai_receipt(result.document)
+
+
+def _usage_key() -> str:
+    now = datetime.utcnow()
+    return f"{now.year}-{now.month:02d}"
+
+
+def _check_and_increment_usage() -> bool:
+    """Atomically checks the monthly limit and increments. Returns False if limit reached."""
+    if not db:
+        return True
+
+    usage_ref = db.collection("app_usage").document(_usage_key())
+
+    try:
+        @firestore.transactional
+        def _run(transaction, ref):
+            snapshot = ref.get(transaction=transaction)
+            count = (snapshot.get("extraction_count") if snapshot.exists else None) or 0
+            if count >= EXTRACTION_LIMIT:
+                return False
+            transaction.set(ref, {"extraction_count": count + 1}, merge=True)
+            return True
+
+        return _run(db.transaction(), usage_ref)
+    except Exception as e:
+        print(f"Usage tracking error: {e}")
+        return True  # fail open on DB errors so extraction still works
+
+
+# ── Gmail webhook ────────────────────────────────────────────────────────────
+
+PENDING_RECEIPT_CAP = 20
+
+
+def _get_gmail_service():
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+
+    creds = Credentials(
+        token=None,
+        refresh_token=os.getenv("GMAIL_REFRESH_TOKEN"),
+        client_id=os.getenv("GMAIL_CLIENT_ID"),
+        client_secret=os.getenv("GMAIL_CLIENT_SECRET"),
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+    )
+    creds.refresh(Request())
+    return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+def _verify_pubsub_jwt(authorization: str | None) -> bool:
+    if not authorization or not authorization.startswith("Bearer "):
+        return False
+    token = authorization.removeprefix("Bearer ")
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as grequests
+
+        audience = os.getenv("GMAIL_WEBHOOK_URL", "")
+        claim = id_token.verify_oauth2_token(token, grequests.Request(), audience=audience or None)
+        return claim.get("iss") in ("accounts.google.com", "https://accounts.google.com")
+    except Exception as e:
+        print(f"Pub/Sub JWT verification failed: {e}")
+        return False
+
+
+def _extract_email_address(header: str) -> str:
+    match = re.search(r"<(.+?)>", header)
+    return match.group(1).strip().lower() if match else header.strip().lower()
+
+
+@app.post("/gmail-webhook")
+async def gmail_webhook(
+    request: Request,
+    token: str = Query(default=""),
+) -> dict:
+    # 1. URL secret check
+    webhook_secret = os.getenv("GMAIL_WEBHOOK_SECRET", "")
+    if webhook_secret and not secrets.compare_digest(token, webhook_secret):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # 2. Pub/Sub OIDC JWT verification
+    if not _verify_pubsub_jwt(request.headers.get("Authorization")):
+        raise HTTPException(status_code=401, detail="Invalid Pub/Sub token")
+
+    # 3. Decode Pub/Sub message
+    try:
+        body = await request.json()
+    except Exception:
+        return {"status": "ok"}
+
+    message = body.get("message", {})
+    data_b64 = message.get("data", "")
+    pubsub_message_id = message.get("messageId", "")
+
+    if not data_b64 or not db:
+        return {"status": "ok"}
+
+    try:
+        data = json.loads(base64.b64decode(data_b64).decode("utf-8"))
+    except Exception:
+        return {"status": "ok"}
+
+    history_id = str(data.get("historyId", ""))
+    if not history_id:
+        return {"status": "ok"}
+
+    # 4. Fetch new messages from Gmail API
+    try:
+        gmail = _get_gmail_service()
+
+        meta_ref = db.collection("app_config").document("gmail")
+        meta_doc = meta_ref.get()
+        last_history_id = (meta_doc.get("last_history_id") if meta_doc.exists else None) or history_id
+
+        history_result = gmail.users().history().list(
+            userId="me",
+            startHistoryId=last_history_id,
+            historyTypes=["messageAdded"],
+        ).execute()
+
+        meta_ref.set({"last_history_id": history_id}, merge=True)
+
+        new_message_ids: list[str] = []
+        for record in history_result.get("history", []):
+            for msg in record.get("messagesAdded", []):
+                new_message_ids.append(msg["message"]["id"])
+
+        for gmail_msg_id in new_message_ids:
+            # 5. Dedup: skip already-processed messages
+            if db.collection("processed_emails").document(gmail_msg_id).get().exists:
+                continue
+
+            # 6. Get From: and Subject headers
+            msg = gmail.users().messages().get(
+                userId="me",
+                id=gmail_msg_id,
+                format="metadata",
+                metadataHeaders=["From", "Subject"],
+            ).execute()
+
+            headers = {
+                h["name"]: h["value"]
+                for h in msg.get("payload", {}).get("headers", [])
+            }
+            from_email = _extract_email_address(headers.get("From", ""))
+            subject = headers.get("Subject", "No Subject")
+
+            # 7. From: must match a registered user
+            user_doc = db.collection("users").document(from_email).get()
+            if not user_doc.exists:
+                db.collection("processed_emails").document(gmail_msg_id).set(
+                    {"status": "unknown_user", "from": from_email, "created_at": datetime.utcnow().isoformat()}
+                )
+                continue
+
+            # 8. Rate limit: cap pending receipts per user
+            pending_count = sum(
+                1 for _ in db.collection("users")
+                .document(from_email)
+                .collection("pending_receipts")
+                .where("status", "==", "pending")
+                .limit(PENDING_RECEIPT_CAP + 1)
+                .stream()
+            )
+            if pending_count >= PENDING_RECEIPT_CAP:
+                db.collection("processed_emails").document(gmail_msg_id).set(
+                    {"status": "rate_limited", "from": from_email, "created_at": datetime.utcnow().isoformat()}
+                )
+                continue
+
+            # 9. Create pending receipt with fake data
+            db.collection("users").document(from_email).collection("pending_receipts").add({
+                "source": "email",
+                "from_email": from_email,
+                "subject": subject,
+                "gmail_message_id": gmail_msg_id,
+                "status": "pending",
+                "created_at": datetime.utcnow().isoformat(),
+                "extracted_data": FAKE_EXTRACTED_RECEIPT,
+            })
+
+            # 10. Mark message as processed
+            db.collection("processed_emails").document(gmail_msg_id).set({
+                "status": "processed",
+                "from": from_email,
+                "created_at": datetime.utcnow().isoformat(),
+            })
+
+    except Exception as e:
+        print(f"Gmail webhook processing error: {e}")
+        # Return 200 so Pub/Sub does not retry endlessly
+
+    return {"status": "ok"}
+
+
+@app.get("/pending-receipts")
+async def get_pending_receipts(
+    userEmail: str = Query(...),
+    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
+) -> dict:
+    if not db:
+        return JSONResponse({"error": "Firebase not initialized", "pending_receipts": []}, status_code=500)
+
+    if not userEmail:
+        return JSONResponse({"error": "User email required", "pending_receipts": []}, status_code=400)
+
+    try:
+        docs = (
+            db.collection("users")
+            .document(userEmail)
+            .collection("pending_receipts")
+            .where("status", "==", "pending")
+            .order_by("created_at", direction="DESCENDING")
+            .stream()
+        )
+
+        receipts = []
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            receipts.append(data)
+
+        return {"pending_receipts": receipts}
+    except Exception as e:
+        print(f"Error fetching pending receipts: {e}")
+        return JSONResponse({"error": str(e), "pending_receipts": []}, status_code=500)
+
+
+@app.delete("/pending-receipts/{receipt_id}")
+async def dismiss_pending_receipt(
+    receipt_id: str,
+    userEmail: str = Query(...),
+    _: Annotated[None, Depends(verify_backend_api_secret)] = None,
+) -> dict:
+    if not db:
+        return JSONResponse({"error": "Firebase not initialized", "dismissed": False}, status_code=500)
+
+    if not userEmail:
+        return JSONResponse({"error": "User email required", "dismissed": False}, status_code=400)
+
+    try:
+        ref = (
+            db.collection("users")
+            .document(userEmail)
+            .collection("pending_receipts")
+            .document(receipt_id)
+        )
+        if not ref.get().exists:
+            return JSONResponse({"error": "Pending receipt not found", "dismissed": False}, status_code=404)
+
+        ref.delete()
+        return {"dismissed": True, "receipt_id": receipt_id}
+    except Exception as e:
+        print(f"Error dismissing pending receipt: {e}")
+        return JSONResponse({"error": str(e), "dismissed": False}, status_code=500)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 class ReceiptItem(BaseModel):
     item: str
@@ -142,6 +510,41 @@ async def extract_receipt(
             status_code=400,
         )
 
+    if _is_document_ai_configured():
+        if not uploaded_files:
+            return JSONResponse(
+                {"error": "A receipt file is required. Please upload a PDF or image."},
+                status_code=400,
+            )
+
+        if not _check_and_increment_usage():
+            return JSONResponse(
+                {
+                    "error": "Monthly extraction limit reached. No credits remaining for this month. Please try again next month."
+                },
+                status_code=429,
+            )
+
+        try:
+            file = uploaded_files[0]
+            file_content = await file.read()
+            mime_type = file.content_type or "image/jpeg"
+            extracted = await _extract_with_document_ai(file_content, mime_type)
+
+            return {
+                "status": "extracted",
+                "userEmail": userEmail,
+                "receiptName": file.filename or "receipt",
+                "extractedReceipt": extracted,
+            }
+        except Exception as e:
+            print(f"Document AI extraction error: {e}")
+            return JSONResponse(
+                {"error": "Failed to extract receipt. Please try again or enter details manually."},
+                status_code=500,
+            )
+
+    # Dev / fake-data fallback when Document AI is not configured
     for file in uploaded_files:
         await file.read()
 
@@ -364,7 +767,6 @@ async def get_receipts(
     userEmail: str = Query(...),
     _: Annotated[None, Depends(verify_backend_api_secret)] = None,
 ) -> dict:
-    """Fetch all receipts for a user, sorted by date (newest first)"""
     if not db:
         return JSONResponse(
             {"error": "Firebase not initialized", "receipts": []}, status_code=500
