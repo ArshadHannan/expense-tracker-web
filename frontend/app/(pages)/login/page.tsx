@@ -112,7 +112,7 @@ export default async function LoginPage({
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-text-secondary">
               Upload receipts, review extracted line items, and build a spending
-              history that predicts where your budget is heading next month.
+              history that predicts where your budget is heading.
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
