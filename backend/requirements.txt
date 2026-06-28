@@ -3,3 +3,6 @@ uvicorn[standard]==0.38.0
 python-multipart==0.0.20
 firebase-admin==6.4.0
 python-dotenv==1.0.0
+google-cloud-documentai==3.5.0
+google-api-python-client==2.151.0
+google-auth-httplib2==0.2.0
