@@ -111,9 +111,8 @@ export default async function LoginPage({
               Turn receipts into trusted expense records
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-text-secondary">
-              Upload receipts, review extracted line items, adjust totals when OCR
-              gets something wrong, and save a clean expense history. All in one
-              place.
+              Log receipts in seconds, keep a clean record of every rupee spent,
+              and see where your spending is headed before the month runs out.
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
