@@ -30,7 +30,7 @@ const features = [
     icon: TrendingUp,
     title: "Spending predictions from past data",
     description:
-      "RupeeFlow analyses your saved receipts month over month to forecast how much you're likely to spend — so you can adjust before you overshoot.",
+      "RupeeFlow analyses your saved receipts month over month to forecast how much you're likely to spend, so you can adjust before you overshoot.",
   },
   {
     icon: Shield,
@@ -112,7 +112,7 @@ export default async function LoginPage({
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-text-secondary">
               Upload receipts, review extracted line items, adjust totals when OCR
-              gets something wrong, and save a clean expense history — all in one
+              gets something wrong, and save a clean expense history. All in one
               place.
             </p>
 
@@ -243,7 +243,7 @@ export default async function LoginPage({
             </h2>
             <p className="mt-4 text-base leading-relaxed text-text-secondary">
               RupeeFlow analyses your past months of saved receipts to predict how
-              much you'll spend this month — so you can course-correct early
+              much you'll spend this month, so you can course-correct early
               instead of overspending and finding out too late.
             </p>
             <ul className="mt-6 space-y-3">
@@ -318,7 +318,7 @@ export default async function LoginPage({
 
             <div className="grid grid-cols-2 gap-3 p-6 pt-4">
               <SummaryTile label="Avg last 5 months" value="40,060" />
-              <SummaryTile highlight label="Predicted — Jun" value="42,300" />
+              <SummaryTile highlight label="Predicted (Jun)" value="42,300" />
             </div>
           </Card>
         </div>

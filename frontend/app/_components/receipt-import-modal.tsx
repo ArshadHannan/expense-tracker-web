@@ -262,7 +262,7 @@ export default function ReceiptImportModal() {
                 Drag and drop a receipt
               </p>
               <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-text-tertiary">
-                PDF, JPEG, PNG, or WebP — one file at a time
+                PDF, JPEG, PNG, or WebP. One file at a time.
               </p>
               <Button
                 className="mt-5"
@@ -282,7 +282,7 @@ export default function ReceiptImportModal() {
             </div>
 
             <Textarea
-              hint="Optional — paste email text if you don't have a file."
+              hint="Optional. Paste email text if you don't have a file."
               label="Receipt email body (optional)"
               onChange={(event) => setEmailBody(event.target.value)}
               placeholder="Paste receipt details from an email here."
