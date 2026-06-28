@@ -10,8 +10,6 @@ import {
 
   BarChart3,
 
-  CheckSquare,
-
   LayoutDashboard,
 
   LogOut,
@@ -84,7 +82,6 @@ const navItems = [
 
   { href: "/budgets", label: "Budgets", icon: Wallet },
 
-  { href: "/approvals", label: "Approvals", icon: CheckSquare },
 
   { href: "/report", label: "Report", icon: BarChart3 },
 
@@ -100,9 +97,15 @@ const pageDescriptions: Record<string, string> = {
 
   "/budgets": "Set and track monthly spending limits",
 
-  "/approvals": "Review and approve pending expenses",
-
   "/report": "Generate spending reports and insights",
+
+  "/profile": "Manage your account and preferences",
+
+};
+
+const pageTitles: Record<string, string> = {
+
+  "/profile": "Profile Settings",
 
 };
 
@@ -125,7 +128,7 @@ function ShellContent({ children, user }: DashboardShellProps) {
 
   const activeItem = navItems.find((item) => item.href === pathname);
 
-  const title = activeItem?.label ?? "Dashboard";
+  const title = activeItem?.label ?? pageTitles[pathname] ?? "Dashboard";
 
   const description =
 
@@ -519,13 +522,15 @@ function ShellContent({ children, user }: DashboardShellProps) {
 
                     <div className="my-1 h-px bg-border" />
 
-                    <button
+                    <Link
 
                       className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2 text-sm text-text-secondary transition hover:bg-white/5 hover:text-text-primary"
 
-                      role="menuitem"
+                      href="/profile"
 
-                      type="button"
+                      onClick={() => setIsProfileMenuOpen(false)}
+
+                      role="menuitem"
 
                     >
 
@@ -533,7 +538,7 @@ function ShellContent({ children, user }: DashboardShellProps) {
 
                       Profile
 
-                    </button>
+                    </Link>
 
                     <form action="/auth/logout" method="POST">
 

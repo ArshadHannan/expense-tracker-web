@@ -25,6 +25,12 @@ function monthKeyToLabel(key: string) {
   });
 }
 
+function toLocalDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+type FilterType = "" | "month" | "year" | "date";
+
 export default function ReceiptsTable({
   receipts,
   totalSpent,
@@ -37,7 +43,10 @@ export default function ReceiptsTable({
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [filterType, setFilterType] = useState<FilterType>("");
   const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterDate, setFilterDate] = useState("");
   const [filterStore, setFilterStore] = useState("");
 
   const availableMonths = useMemo(() => {
@@ -48,39 +57,52 @@ export default function ReceiptsTable({
     return Array.from(monthSet).sort().reverse();
   }, [receipts]);
 
-  const availableStores = useMemo(() => {
-    const storeSet = new Set<string>();
+  const availableYears = useMemo(() => {
+    const yearSet = new Set<string>();
     for (const receipt of receipts) {
-      const name = receipt.store_name || receipt.expense_name;
-      if (name) storeSet.add(name);
+      yearSet.add(String(new Date(receipt.created_at).getFullYear()));
     }
-    return Array.from(storeSet).sort();
+    return Array.from(yearSet).sort().reverse();
   }, [receipts]);
 
   const filteredReceipts = useMemo(() => {
     return receipts.filter((receipt) => {
-      if (filterMonth) {
-        const key = toMonthKey(new Date(receipt.created_at));
-        if (key !== filterMonth) return false;
+      const d = new Date(receipt.created_at);
+      if (filterType === "month" && filterMonth) {
+        if (toMonthKey(d) !== filterMonth) return false;
       }
-      if (filterStore) {
-        const name = receipt.store_name || receipt.expense_name || "";
-        if (name !== filterStore) return false;
+      if (filterType === "year" && filterYear) {
+        if (String(d.getFullYear()) !== filterYear) return false;
+      }
+      if (filterType === "date" && filterDate) {
+        if (toLocalDateString(d) !== filterDate) return false;
+      }
+      if (filterStore.trim()) {
+        const name = (receipt.store_name || receipt.expense_name || "").toLowerCase();
+        if (!name.includes(filterStore.toLowerCase())) return false;
       }
       return true;
     });
-  }, [receipts, filterMonth, filterStore]);
+  }, [receipts, filterType, filterMonth, filterYear, filterDate, filterStore]);
 
   const filteredTotalSpent = useMemo(
     () => filteredReceipts.reduce((sum, r) => sum + (r.total_amount_value ?? 0), 0),
     [filteredReceipts],
   );
 
-  const isFiltered = filterMonth !== "" || filterStore !== "";
+  const isFiltered =
+    (filterType !== "" && (filterMonth !== "" || filterYear !== "" || filterDate !== "")) ||
+    filterStore.trim() !== "";
+
+  useEffect(() => {
+    setFilterMonth("");
+    setFilterYear("");
+    setFilterDate("");
+  }, [filterType]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterMonth, filterStore]);
+  }, [filterType, filterMonth, filterYear, filterDate, filterStore]);
 
   const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / pageSize));
   const visiblePage = Math.min(currentPage, totalPages);
@@ -141,52 +163,90 @@ export default function ReceiptsTable({
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Month filter */}
+        {/* Filter type */}
         <div className="relative">
           <select
             className="cursor-pointer appearance-none rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            onChange={(e) => setFilterMonth(e.target.value)}
-            value={filterMonth}
+            onChange={(e) => setFilterType(e.target.value as FilterType)}
+            value={filterType}
           >
-            <option value="">All months</option>
-            {availableMonths.map((key) => (
-              <option key={key} value={key}>
-                {monthKeyToLabel(key)}
-              </option>
-            ))}
+            <option value="">Filter by...</option>
+            <option value="month">Month</option>
+            <option value="year">Year</option>
+            <option value="date">Date</option>
           </select>
           <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-tertiary" />
         </div>
 
-        {/* Store filter */}
-        <div className="relative">
-          <select
-            className="cursor-pointer appearance-none rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            onChange={(e) => setFilterStore(e.target.value)}
-            value={filterStore}
-          >
-            <option value="">All stores</option>
-            {availableStores.map((store) => (
-              <option key={store} value={store}>
-                {store}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-tertiary" />
-        </div>
+        {/* Month picker */}
+        {filterType === "month" ? (
+          <div className="relative">
+            <select
+              className="cursor-pointer appearance-none rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={(e) => setFilterMonth(e.target.value)}
+              value={filterMonth}
+            >
+              <option value="">Select month</option>
+              {availableMonths.map((key) => (
+                <option key={key} value={key}>
+                  {monthKeyToLabel(key)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-tertiary" />
+          </div>
+        ) : null}
 
-        {/* Clear filters */}
+        {/* Year picker */}
+        {filterType === "year" ? (
+          <div className="relative">
+            <select
+              className="cursor-pointer appearance-none rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={(e) => setFilterYear(e.target.value)}
+              value={filterYear}
+            >
+              <option value="">Select year</option>
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-tertiary" />
+          </div>
+        ) : null}
+
+        {/* Date picker */}
+        {filterType === "date" ? (
+          <input
+            className="rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-3 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            onChange={(e) => setFilterDate(e.target.value)}
+            type="date"
+            value={filterDate}
+          />
+        ) : null}
+
+        {/* Store search */}
+        <input
+          className="rounded-[var(--radius-md)] border border-border bg-surface py-1.5 pl-3 pr-3 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-primary"
+          onChange={(e) => setFilterStore(e.target.value)}
+          placeholder="Search store..."
+          type="text"
+          value={filterStore}
+        />
+
+        {/* Clear */}
         {isFiltered ? (
           <Button
             onClick={() => {
-              setFilterMonth("");
+              setFilterType("");
               setFilterStore("");
             }}
             size="sm"
             variant="ghost"
           >
             <X className="mr-1.5 size-3.5" />
-            Clear filters
+            Clear
           </Button>
         ) : null}
       </div>
