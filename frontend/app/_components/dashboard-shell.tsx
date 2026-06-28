@@ -10,6 +10,8 @@ import {
 
   BarChart3,
 
+  Bell,
+
   LayoutDashboard,
 
   LogOut,
@@ -52,9 +54,19 @@ import {
 
 import AddExpenseModal from "./add-expense-modal";
 
+import PendingReceiptsModal from "./pending-receipts-modal";
+
 import { Button } from "./ui/button";
 
 import ReceiptImportModal from "./receipt-import-modal";
+
+import {
+
+  PendingReceiptsProvider,
+
+  usePendingReceipts,
+
+} from "../_lib/pending-receipts-context";
 
 
 
@@ -117,6 +129,7 @@ function ShellContent({ children, user }: DashboardShellProps) {
 
   const { open: openImport } = useReceiptImport();
   const { open: openAddExpense } = useAddExpense();
+  const { pendingReceipts, open: openPendingReceipts } = usePendingReceipts();
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -474,6 +487,32 @@ function ShellContent({ children, user }: DashboardShellProps) {
 
 
 
+              <button
+
+                aria-label={`${pendingReceipts.length} pending email receipt${pendingReceipts.length !== 1 ? "s" : ""}`}
+
+                className="relative grid size-9 place-items-center rounded-[var(--radius-md)] border border-border text-text-secondary transition hover:border-primary/40 hover:text-primary"
+
+                onClick={openPendingReceipts}
+
+                type="button"
+
+              >
+
+                <Bell className="size-4" />
+
+                {pendingReceipts.length > 0 ? (
+
+                  <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-text-button">
+
+                    {pendingReceipts.length}
+
+                  </span>
+
+                ) : null}
+
+              </button>
+
               <div className="relative" ref={profileMenuRef}>
 
                 <button
@@ -588,6 +627,8 @@ function ShellContent({ children, user }: DashboardShellProps) {
 
       <AddExpenseModal />
 
+      <PendingReceiptsModal />
+
     </div>
 
   );
@@ -606,7 +647,11 @@ export default function DashboardShell(props: DashboardShellProps) {
 
         <AddExpenseProvider>
 
-          <ShellContent {...props} />
+          <PendingReceiptsProvider>
+
+            <ShellContent {...props} />
+
+          </PendingReceiptsProvider>
 
         </AddExpenseProvider>
 
