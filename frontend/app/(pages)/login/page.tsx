@@ -6,6 +6,7 @@ import {
   Shield,
   Sparkles,
   Table2,
+  TrendingUp,
 } from "lucide-react";
 import { Badge } from "../../_components/ui/badge";
 import { Button } from "../../_components/ui/button";
@@ -26,6 +27,12 @@ const features = [
       "Keep every saved receipt organized by store, amount, and date with quick access to the full breakdown.",
   },
   {
+    icon: TrendingUp,
+    title: "Spending predictions from past data",
+    description:
+      "RupeeFlow analyses your saved receipts month over month to forecast how much you're likely to spend — so you can adjust before you overshoot.",
+  },
+  {
     icon: Shield,
     title: "Built for rupee tracking",
     description:
@@ -37,6 +44,21 @@ const previewItems = [
   { amount: "3,250", item: "Basmati rice 5kg", quantity: "1" },
   { amount: "1,080", item: "Fresh milk 1L", quantity: "2" },
   { amount: "1,450", item: "Vegetables bundle", quantity: "1" },
+];
+
+const spendingData = [
+  { month: "Jan", amount: 38200 },
+  { month: "Feb", amount: 41500 },
+  { month: "Mar", amount: 36800 },
+  { month: "Apr", amount: 44100 },
+  { month: "May", amount: 39700 },
+  { month: "Jun", amount: 42300, predicted: true },
+];
+
+const predictionPoints = [
+  "Forecasts next month's spend based on your last 3–6 months of receipts",
+  "Highlights categories where you're trending over budget",
+  "Updates automatically each time you save a new receipt",
 ];
 
 const steps = [
@@ -209,9 +231,102 @@ export default async function LoginPage({
         </div>
       </section>
 
+      {/* Predictions section */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="animate-fade-up">
+            <p className="text-xs font-medium uppercase tracking-wider text-primary">
+              Spending intelligence
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+              Know where your budget is heading
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-text-secondary">
+              RupeeFlow analyses your past months of saved receipts to predict how
+              much you'll spend this month — so you can course-correct early
+              instead of overspending and finding out too late.
+            </p>
+            <ul className="mt-6 space-y-3">
+              {predictionPoints.map((point) => (
+                <li
+                  className="flex items-start gap-2.5 text-sm text-text-secondary"
+                  key={point}
+                >
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <Card
+            className="animate-fade-up stagger-2 shadow-xl"
+            padding="none"
+            variant="elevated"
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-5">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                  Spending trend
+                </p>
+                <h3 className="mt-1 text-lg font-semibold tracking-tight">
+                  Monthly forecast
+                </h3>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft/40 px-3 py-1 text-xs font-medium text-primary">
+                <TrendingUp className="size-3" />
+                Predicted
+              </div>
+            </div>
+
+            <div className="px-6 pb-2 pt-6">
+              <div className="flex h-36 items-end gap-2">
+                {spendingData.map((d) => {
+                  const heightPct = Math.round((d.amount / 50000) * 100);
+                  return (
+                    <div
+                      className="flex flex-1 flex-col items-center gap-1.5"
+                      key={d.month}
+                    >
+                      <span className="text-[10px] tabular-nums text-text-tertiary">
+                        {Math.round(d.amount / 1000)}k
+                      </span>
+                      <div
+                        className={`w-full rounded-t-[3px] transition-all ${
+                          d.predicted
+                            ? "border border-dashed border-primary/50 bg-primary-soft/40"
+                            : "bg-primary/70"
+                        }`}
+                        style={{ height: `${heightPct}%` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-1.5 flex gap-2">
+                {spendingData.map((d) => (
+                  <div className="flex flex-1 justify-center" key={d.month}>
+                    <span
+                      className={`text-[10px] font-medium ${d.predicted ? "text-primary" : "text-text-tertiary"}`}
+                    >
+                      {d.month}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 p-6 pt-4">
+              <SummaryTile label="Avg last 5 months" value="40,060" />
+              <SummaryTile highlight label="Predicted — Jun" value="42,300" />
+            </div>
+          </Card>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="mx-auto max-w-7xl px-6 py-16">
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2">
           {features.map((feature) => {
             const Icon = feature.icon;
             return (
